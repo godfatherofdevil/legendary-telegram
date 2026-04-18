@@ -357,6 +357,14 @@ The backend container command in the sample Compose file runs migrations on star
 python manage.py migrate
 ```
 
+For local Docker Compose only, the backend also enables guarded recovery for one specific stale-volume case:
+
+* if PostgreSQL still contains the old migration history where `admin.0001_initial` was applied before `accounts.0001_initial`
+* startup resets the local database schema and reapplies migrations
+* this recovery is controlled by `DJANGO_RESET_INCONSISTENT_MIGRATIONS=1` in the Compose backend service
+
+This is intended for local development after introducing the custom `accounts.User` model. It should not be enabled for environments where preserving database contents matters.
+
 If manual migration execution is preferred, use:
 
 ```bash

@@ -264,6 +264,8 @@ From repository root:
 docker compose up --build
 ```
 
+The backend Compose service enables guarded local recovery for a stale Postgres volume that still records `admin.0001_initial` before `accounts.0001_initial`. In that exact case, startup resets the local database schema and reapplies migrations so the custom user model boots cleanly.
+
 ## 10.3 Verify services
 
 - Frontend: `http://localhost:3000`

@@ -206,6 +206,10 @@ Agents MUST:
 - verify new endpoints match `API_CONTRACT.md`
 - verify permission and access-control rules
 - verify imports and module boundaries remain clean
+- if any database migrations were added then verify it by running following command
+```bash 
+docker compose up -d postgres && sleep 10 && cd backend && python manage.py migrate
+```
 
 ---
 

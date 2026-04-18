@@ -3,7 +3,6 @@ from pathlib import Path
 
 import dj_database_url
 
-
 BASE_DIR = Path(__file__).resolve().parent.parent
 
 
@@ -36,6 +35,12 @@ INSTALLED_APPS = [
     "rest_framework",
     "channels",
     "apps.common",
+    "apps.accounts",
+    "apps.presence",
+    "apps.social",
+    "apps.chat",
+    "apps.attachments",
+    "apps.audit",
 ]
 
 MIDDLEWARE = [
@@ -113,6 +118,7 @@ STATIC_URL = "static/"
 STATIC_ROOT = BASE_DIR / "staticfiles"
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
+AUTH_USER_MODEL = "accounts.User"
 
 SESSION_COOKIE_HTTPONLY = True
 SESSION_COOKIE_SECURE = not DEBUG

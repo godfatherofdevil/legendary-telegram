@@ -43,6 +43,8 @@ services:
     restart: unless-stopped
     env_file:
       - .env
+    environment:
+      DJANGO_RESET_INCONSISTENT_MIGRATIONS: "1"
     depends_on:
       postgres:
         condition: service_healthy
