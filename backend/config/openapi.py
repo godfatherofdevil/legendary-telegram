@@ -91,9 +91,12 @@ def build_openapi_schema(request) -> dict:
             {"name": "Account"},
             {"name": "Sessions"},
             {"name": "Users"},
+            {"name": "Social"},
             {"name": "Rooms"},
             {"name": "Dialogs"},
             {"name": "Attachments"},
+            {"name": "Presence"},
+            {"name": "Notifications"},
             {"name": "Documentation"},
         ],
         "paths": {
@@ -237,6 +240,103 @@ def build_openapi_schema(request) -> dict:
                     ],
                 )
             },
+            "/api/v1/friends": {
+                "get": _operation(
+                    summary="List friends",
+                    tags=["Social"],
+                    description="Returns the authenticated user's accepted friendships.",
+                    response_description="Friend list payload.",
+                )
+            },
+            "/api/v1/friends/{user_id}": {
+                "delete": _operation(
+                    summary="Remove friend",
+                    tags=["Social"],
+                    description="Removes an existing friendship and freezes direct messaging.",
+                    response_description="Friend removed.",
+                    parameters=[
+                        _path_parameter("user_id", "User identifier.", schema_format="uuid")
+                    ],
+                    status_code="204",
+                )
+            },
+            "/api/v1/friend-requests/incoming": {
+                "get": _operation(
+                    summary="List incoming friend requests",
+                    tags=["Social"],
+                    description="Returns pending friend requests received by the authenticated user.",
+                    response_description="Incoming friend request list payload.",
+                )
+            },
+            "/api/v1/friend-requests/outgoing": {
+                "get": _operation(
+                    summary="List outgoing friend requests",
+                    tags=["Social"],
+                    description="Returns pending friend requests sent by the authenticated user.",
+                    response_description="Outgoing friend request list payload.",
+                )
+            },
+            "/api/v1/friend-requests": {
+                "post": _operation(
+                    summary="Create friend request",
+                    tags=["Social"],
+                    description="Sends a new friend request to the target username.",
+                    response_description="Created friend request payload.",
+                    request_body=_json_request_body(["username"]),
+                    status_code="201",
+                )
+            },
+            "/api/v1/friend-requests/{request_id}/accept": {
+                "post": _operation(
+                    summary="Accept friend request",
+                    tags=["Social"],
+                    description="Accepts a pending incoming friend request.",
+                    response_description="Accepted friendship payload.",
+                    parameters=[
+                        _path_parameter("request_id", "Friend request identifier.", schema_format="uuid")
+                    ],
+                )
+            },
+            "/api/v1/friend-requests/{request_id}/reject": {
+                "post": _operation(
+                    summary="Reject friend request",
+                    tags=["Social"],
+                    description="Rejects a pending incoming friend request.",
+                    response_description="Friend request rejected.",
+                    parameters=[
+                        _path_parameter("request_id", "Friend request identifier.", schema_format="uuid")
+                    ],
+                    status_code="204",
+                )
+            },
+            "/api/v1/user-bans": {
+                "get": _operation(
+                    summary="List peer bans",
+                    tags=["Social"],
+                    description="Returns active peer bans created by the authenticated user.",
+                    response_description="Peer ban list payload.",
+                ),
+                "post": _operation(
+                    summary="Create peer ban",
+                    tags=["Social"],
+                    description="Creates or reactivates a peer ban and freezes direct messaging.",
+                    response_description="Created peer ban payload.",
+                    request_body=_json_request_body(["user_id"]),
+                    status_code="201",
+                ),
+            },
+            "/api/v1/user-bans/{user_id}": {
+                "delete": _operation(
+                    summary="Remove peer ban",
+                    tags=["Social"],
+                    description="Removes an active peer ban created by the authenticated user.",
+                    response_description="Peer ban removed.",
+                    parameters=[
+                        _path_parameter("user_id", "User identifier.", schema_format="uuid")
+                    ],
+                    status_code="204",
+                )
+            },
             "/api/v1/rooms/public": {
                 "get": _operation(
                     summary="List public rooms",
@@ -332,6 +432,134 @@ def build_openapi_schema(request) -> dict:
                     ],
                 )
             },
+            "/api/v1/rooms/{room_id}/invitations": {
+                "get": _operation(
+                    summary="List room invitations",
+                    tags=["Rooms"],
+                    description="Returns pending invitations for a room when the actor may manage invites.",
+                    response_description="Room invitation list payload.",
+                    parameters=[
+                        _path_parameter("room_id", "Room identifier.", schema_format="uuid")
+                    ],
+                ),
+                "post": _operation(
+                    summary="Create room invitation",
+                    tags=["Rooms"],
+                    description="Creates a pending invitation for a private room.",
+                    response_description="Created room invitation payload.",
+                    parameters=[
+                        _path_parameter("room_id", "Room identifier.", schema_format="uuid")
+                    ],
+                    request_body=_json_request_body(["username"]),
+                    status_code="201",
+                ),
+            },
+            "/api/v1/room-invitations/{invitation_id}/accept": {
+                "post": _operation(
+                    summary="Accept room invitation",
+                    tags=["Rooms"],
+                    description="Accepts a pending room invitation for the authenticated user.",
+                    response_description="Invitation accepted.",
+                    parameters=[
+                        _path_parameter(
+                            "invitation_id",
+                            "Room invitation identifier.",
+                            schema_format="uuid",
+                        )
+                    ],
+                    status_code="204",
+                )
+            },
+            "/api/v1/room-invitations/{invitation_id}/reject": {
+                "post": _operation(
+                    summary="Reject room invitation",
+                    tags=["Rooms"],
+                    description="Rejects a pending room invitation for the authenticated user.",
+                    response_description="Invitation rejected.",
+                    parameters=[
+                        _path_parameter(
+                            "invitation_id",
+                            "Room invitation identifier.",
+                            schema_format="uuid",
+                        )
+                    ],
+                    status_code="204",
+                )
+            },
+            "/api/v1/rooms/{room_id}/admins": {
+                "post": _operation(
+                    summary="Promote room admin",
+                    tags=["Rooms"],
+                    description="Promotes an existing room member to admin.",
+                    response_description="Member promoted to admin.",
+                    parameters=[
+                        _path_parameter("room_id", "Room identifier.", schema_format="uuid")
+                    ],
+                    request_body=_json_request_body(["user_id"]),
+                    status_code="204",
+                )
+            },
+            "/api/v1/rooms/{room_id}/admins/{user_id}": {
+                "delete": _operation(
+                    summary="Demote room admin",
+                    tags=["Rooms"],
+                    description="Demotes an admin back to a standard member when allowed.",
+                    response_description="Admin demoted.",
+                    parameters=[
+                        _path_parameter("room_id", "Room identifier.", schema_format="uuid"),
+                        _path_parameter("user_id", "User identifier.", schema_format="uuid"),
+                    ],
+                    status_code="204",
+                )
+            },
+            "/api/v1/rooms/{room_id}/remove-member": {
+                "post": _operation(
+                    summary="Remove room member",
+                    tags=["Rooms"],
+                    description="Removes a member from a room and treats the action as a ban.",
+                    response_description="Member removed and banned.",
+                    parameters=[
+                        _path_parameter("room_id", "Room identifier.", schema_format="uuid")
+                    ],
+                    request_body=_json_request_body(["user_id"]),
+                    status_code="204",
+                )
+            },
+            "/api/v1/rooms/{room_id}/bans": {
+                "get": _operation(
+                    summary="List room bans",
+                    tags=["Rooms"],
+                    description="Returns active room bans for actors allowed to moderate the room.",
+                    response_description="Room ban list payload.",
+                    parameters=[
+                        _path_parameter("room_id", "Room identifier.", schema_format="uuid")
+                    ],
+                ),
+                "post": _operation(
+                    summary="Create room ban",
+                    tags=["Rooms"],
+                    description="Bans a room member and removes room access immediately.",
+                    response_description="Created room ban payload.",
+                    parameters=[
+                        _path_parameter("room_id", "Room identifier.", schema_format="uuid")
+                    ],
+                    request_body=_json_request_body(["user_id"]),
+                    status_code="201",
+                ),
+            },
+            "/api/v1/rooms/{room_id}/bans/{user_id}": {
+                "delete": _operation(
+                    summary="Remove room ban",
+                    tags=["Rooms"],
+                    description="Removes an active room ban.",
+                    response_description="Room ban removed.",
+                    parameters=[
+                        _path_parameter("room_id", "Room identifier.", schema_format="uuid"),
+                        _path_parameter("user_id", "User identifier.", schema_format="uuid"),
+                    ],
+                    status_code="204",
+                )
+            },
             "/api/v1/dialogs": {
                 "get": _operation(
                     summary="List dialogs",
@@ -411,6 +639,26 @@ def build_openapi_schema(request) -> dict:
                             schema_format="uuid",
                         )
                     ],
+                )
+            },
+            "/api/v1/presence/query": {
+                "post": _operation(
+                    summary="Query user presence",
+                    tags=["Presence"],
+                    description="Returns computed presence snapshots for the requested users.",
+                    response_description="Presence query payload.",
+                    request_body=_json_request_body(["user_ids"]),
+                )
+            },
+            "/api/v1/notifications/summary": {
+                "get": _operation(
+                    summary="Get notification summary",
+                    tags=["Notifications"],
+                    description=(
+                        "Returns unread room counts, unread dialog counts, "
+                        "and the incoming pending friend request count."
+                    ),
+                    response_description="Notification summary payload.",
                 )
             },
         },

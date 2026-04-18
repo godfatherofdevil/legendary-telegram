@@ -686,3 +686,135 @@ def test_dialog_message_send_rejects_frozen_dialog_and_peer_ban_but_history_rema
         format="json",
     )
     assert peer_ban_send.status_code == 403
+
+
+@pytest.mark.django_db
+def test_private_room_invitation_flow_requires_admin_and_creates_membership(
+    api_client: APIClient,
+) -> None:
+    owner = create_user(email="invite-owner@example.com", username="invite-owner")
+    admin = create_user(email="invite-admin@example.com", username="invite-admin")
+    invited = create_user(email="invite-user@example.com", username="invite-user")
+    outsider = create_user(email="invite-outsider@example.com", username="invite-outsider")
+    room = create_room(owner=owner, name="private-invites", visibility=RoomVisibility.PRIVATE)
+    RoomMembership.objects.create(
+        room=room, user=admin, role=RoomRole.ADMIN, joined_at=timezone.now()
+    )
+
+    outsider_client = APIClient()
+    outsider_client.force_login(outsider)
+    admin_client = APIClient()
+    admin_client.force_login(admin)
+    invited_client = APIClient()
+    invited_client.force_login(invited)
+
+    forbidden_response = outsider_client.post(
+        reverse("room-invitation-list-create", kwargs={"room_id": room.id}),
+        {"username": invited.username},
+        format="json",
+    )
+    assert forbidden_response.status_code == 404
+
+    create_response = admin_client.post(
+        reverse("room-invitation-list-create", kwargs={"room_id": room.id}),
+        {"username": invited.username},
+        format="json",
+    )
+    assert create_response.status_code == 201
+    invitation_id = create_response.json()["data"]["invitation"]["id"]
+
+    list_response = admin_client.get(reverse("room-invitation-list-create", kwargs={"room_id": room.id}))
+    assert list_response.status_code == 200
+    assert list_response.json()["data"][0]["user"]["username"] == invited.username
+
+    accept_response = invited_client.post(
+        reverse("room-invitation-accept", kwargs={"invitation_id": invitation_id})
+    )
+    assert accept_response.status_code == 204
+    membership = RoomMembership.objects.get(room=room, user=invited)
+    assert membership.role == RoomRole.MEMBER
+    assert membership.invited_by_user_id == admin.id
+
+
+@pytest.mark.django_db
+def test_room_admin_promotion_and_demotion_follow_role_rules(api_client: APIClient) -> None:
+    owner = create_user(email="role-owner@example.com", username="role-owner")
+    admin = create_user(email="role-admin@example.com", username="role-admin")
+    member = create_user(email="role-member@example.com", username="role-member")
+    room = create_room(owner=owner, name="role-room", visibility=RoomVisibility.PUBLIC)
+    RoomMembership.objects.create(
+        room=room, user=admin, role=RoomRole.ADMIN, joined_at=timezone.now()
+    )
+    RoomMembership.objects.create(
+        room=room, user=member, role=RoomRole.MEMBER, joined_at=timezone.now()
+    )
+
+    owner_client = APIClient()
+    owner_client.force_login(owner)
+    admin_client = APIClient()
+    admin_client.force_login(admin)
+
+    promote_response = admin_client.post(
+        reverse("room-admin-list", kwargs={"room_id": room.id}),
+        {"user_id": str(member.id)},
+        format="json",
+    )
+    assert promote_response.status_code == 403
+
+    owner_promote_response = owner_client.post(
+        reverse("room-admin-list", kwargs={"room_id": room.id}),
+        {"user_id": str(member.id)},
+        format="json",
+    )
+    assert owner_promote_response.status_code == 204
+    RoomMembership.objects.get(room=room, user=member, role=RoomRole.ADMIN)
+
+    owner_client.delete(reverse("room-admin-detail", kwargs={"room_id": room.id, "user_id": member.id}))
+    RoomMembership.objects.get(room=room, user=member, role=RoomRole.MEMBER)
+
+    self_demote_response = admin_client.delete(
+        reverse("room-admin-detail", kwargs={"room_id": room.id, "user_id": admin.id})
+    )
+    assert self_demote_response.status_code == 403
+
+
+@pytest.mark.django_db
+def test_room_remove_member_and_room_ban_flow_enforces_access_rules(api_client: APIClient) -> None:
+    owner = create_user(email="ban-owner@example.com", username="ban-owner")
+    admin = create_user(email="ban-admin@example.com", username="ban-admin")
+    member = create_user(email="ban-member@example.com", username="ban-member")
+    room = create_room(owner=owner, name="ban-room", visibility=RoomVisibility.PUBLIC)
+    RoomMembership.objects.create(
+        room=room, user=admin, role=RoomRole.ADMIN, joined_at=timezone.now()
+    )
+    RoomMembership.objects.create(
+        room=room, user=member, role=RoomRole.MEMBER, joined_at=timezone.now()
+    )
+    RoomMessage.objects.create(room=room, sender_user=owner, text="visible before ban")
+
+    admin_client = APIClient()
+    admin_client.force_login(admin)
+    member_client = APIClient()
+    member_client.force_login(member)
+
+    remove_response = admin_client.post(
+        reverse("room-remove-member", kwargs={"room_id": room.id}),
+        {"user_id": str(member.id)},
+        format="json",
+    )
+    assert remove_response.status_code == 204
+    assert RoomMembership.objects.filter(room=room, user=member).exists() is False
+    assert RoomBan.objects.filter(room=room, user=member, removed_at__isnull=True).exists() is True
+
+    banned_history = member_client.get(reverse("room-message-list-create", kwargs={"room_id": room.id}))
+    assert banned_history.status_code == 404
+
+    ban_list_response = admin_client.get(reverse("room-ban-list-create", kwargs={"room_id": room.id}))
+    assert ban_list_response.status_code == 200
+    assert ban_list_response.json()["data"][0]["user"]["username"] == member.username
+
+    unban_response = admin_client.delete(
+        reverse("room-ban-detail", kwargs={"room_id": room.id, "user_id": member.id})
+    )
+    assert unban_response.status_code == 204
+    assert RoomBan.objects.filter(room=room, user=member, removed_at__isnull=True).exists() is False

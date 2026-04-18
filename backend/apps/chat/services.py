@@ -20,6 +20,7 @@ from apps.chat.models import (
     DialogReadState,
     Room,
     RoomBan,
+    RoomInvitation,
     RoomMembership,
     RoomMessage,
     RoomReadState,
@@ -100,6 +101,20 @@ def get_user_room_role(*, room: Room, user: User) -> str:
         RoomMembership.objects.filter(room=room, user=user).values_list("role", flat=True).first()
     )
     return membership or "none"
+
+
+def require_room_owner(*, room: Room, user: User) -> str:
+    role = get_user_room_role(room=room, user=user)
+    if role != RoomRole.OWNER:
+        raise DomainForbiddenError("Only the room owner may perform this action.")
+    return role
+
+
+def require_room_admin_or_owner(*, room: Room, user: User) -> str:
+    role = get_user_room_role(room=room, user=user)
+    if role not in {RoomRole.OWNER, RoomRole.ADMIN}:
+        raise DomainForbiddenError("You are not allowed to perform this action.")
+    return role
 
 
 def get_room_for_detail(*, room_id, user: User) -> Room:
@@ -326,6 +341,193 @@ def list_room_members(*, room: Room):
         key=lambda item: (role_order[item.role], item.user.username, str(item.user.id))
     )
     return memberships
+
+
+def list_room_invitations(*, room: Room, actor: User):
+    require_room_admin_or_owner(room=room, user=actor)
+    return (
+        RoomInvitation.objects.filter(room=room, status="pending")
+        .select_related("invited_user")
+        .order_by("-created_at", "-id")
+    )
+
+
+@transaction.atomic
+def create_room_invitation(*, room: Room, actor: User, invited_user: User) -> RoomInvitation:
+    require_room_admin_or_owner(room=room, user=actor)
+    if room.visibility != RoomVisibility.PRIVATE:
+        raise DomainConflictError("Invitations are only supported for private rooms.")
+    if invited_user.id == actor.id:
+        raise DomainValidationError("You cannot invite yourself.")
+    if is_room_banned(room=room, user=invited_user):
+        raise DomainForbiddenError("This user is banned from the room.")
+    if is_room_member(room=room, user=invited_user):
+        raise DomainConflictError("This user is already a member of the room.")
+    invitation, created = RoomInvitation.objects.get_or_create(
+        room=room,
+        invited_user=invited_user,
+        status="pending",
+        defaults={"invited_by_user": actor},
+    )
+    if not created:
+        raise DomainConflictError("A pending invitation already exists for this user.")
+    return invitation
+
+
+@transaction.atomic
+def accept_room_invitation(*, invitation_id, actor: User) -> None:
+    invitation = (
+        RoomInvitation.objects.select_for_update()
+        .select_related("room", "invited_user", "invited_by_user")
+        .filter(id=invitation_id)
+        .first()
+    )
+    if invitation is None or invitation.invited_user_id != actor.id:
+        raise RoomInvitation.DoesNotExist
+    if invitation.status != "pending":
+        raise DomainConflictError("This invitation is no longer pending.")
+    if is_room_banned(room=invitation.room, user=actor):
+        raise DomainForbiddenError("You are banned from this room.")
+    RoomMembership.objects.get_or_create(
+        room=invitation.room,
+        user=actor,
+        defaults={
+            "role": RoomRole.MEMBER,
+            "joined_at": timezone.now(),
+            "invited_by_user": invitation.invited_by_user,
+        },
+    )
+    invitation.status = "accepted"
+    invitation.responded_at = timezone.now()
+    invitation.save(update_fields=["status", "responded_at", "updated_at"])
+
+
+@transaction.atomic
+def reject_room_invitation(*, invitation_id, actor: User) -> None:
+    invitation = RoomInvitation.objects.select_for_update().filter(id=invitation_id).first()
+    if invitation is None or invitation.invited_user_id != actor.id:
+        raise RoomInvitation.DoesNotExist
+    if invitation.status != "pending":
+        raise DomainConflictError("This invitation is no longer pending.")
+    invitation.status = "rejected"
+    invitation.responded_at = timezone.now()
+    invitation.save(update_fields=["status", "responded_at", "updated_at"])
+
+
+@transaction.atomic
+def promote_room_admin(*, room: Room, actor: User, target_user: User) -> None:
+    require_room_owner(room=room, user=actor)
+    membership = (
+        RoomMembership.objects.select_for_update().filter(room=room, user=target_user).first()
+    )
+    if membership is None:
+        raise RoomMembership.DoesNotExist
+    if membership.role == RoomRole.OWNER:
+        raise DomainForbiddenError("The room owner already has owner privileges.")
+    if membership.role == RoomRole.ADMIN:
+        raise DomainConflictError("This user is already an admin.")
+    membership.role = RoomRole.ADMIN
+    membership.save(update_fields=["role", "updated_at"])
+    ModerationEvent.objects.create(
+        action_type=ModerationActionType.ADMIN_PROMOTED,
+        actor_user=actor,
+        target_user=target_user,
+        room=room,
+    )
+
+
+@transaction.atomic
+def demote_room_admin(*, room: Room, actor: User, target_user: User) -> None:
+    actor_role = require_room_admin_or_owner(room=room, user=actor)
+    membership = (
+        RoomMembership.objects.select_for_update().filter(room=room, user=target_user).first()
+    )
+    if membership is None:
+        raise RoomMembership.DoesNotExist
+    if membership.role == RoomRole.OWNER:
+        raise DomainForbiddenError("You cannot remove owner admin status.")
+    if membership.role != RoomRole.ADMIN:
+        raise DomainConflictError("This user is not an admin.")
+    if actor_role == RoomRole.ADMIN and target_user.id == actor.id:
+        raise DomainForbiddenError("Admins cannot remove their own admin status.")
+    membership.role = RoomRole.MEMBER
+    membership.save(update_fields=["role", "updated_at"])
+    ModerationEvent.objects.create(
+        action_type=ModerationActionType.ADMIN_DEMOTED,
+        actor_user=actor,
+        target_user=target_user,
+        room=room,
+    )
+
+
+def _get_room_member_for_moderation(*, room: Room, actor: User, target_user: User) -> RoomMembership:
+    actor_role = require_room_admin_or_owner(room=room, user=actor)
+    membership = (
+        RoomMembership.objects.select_for_update().filter(room=room, user=target_user).first()
+    )
+    if membership is None:
+        raise RoomMembership.DoesNotExist
+    if membership.role == RoomRole.OWNER:
+        raise DomainForbiddenError("The room owner cannot be moderated.")
+    if actor_role == RoomRole.ADMIN and membership.role == RoomRole.ADMIN:
+        raise DomainForbiddenError("Room admins cannot moderate other admins.")
+    return membership
+
+
+@transaction.atomic
+def create_room_ban(*, room: Room, actor: User, target_user: User, action_type: str) -> RoomBan:
+    membership = _get_room_member_for_moderation(room=room, actor=actor, target_user=target_user)
+    membership.delete()
+    RoomReadState.objects.filter(room=room, user=target_user).delete()
+    ban, created = RoomBan.objects.select_for_update().get_or_create(
+        room=room,
+        user=target_user,
+        defaults={"banned_by_user": actor, "removed_at": None},
+    )
+    if not created and ban.removed_at is None:
+        raise DomainConflictError("This user is already banned from the room.")
+    if not created:
+        ban.banned_by_user = actor
+        ban.reason = None
+        ban.removed_at = None
+        ban.created_at = timezone.now()
+        ban.save(update_fields=["banned_by_user", "reason", "removed_at", "created_at"])
+    ModerationEvent.objects.create(
+        action_type=action_type,
+        actor_user=actor,
+        target_user=target_user,
+        room=room,
+    )
+    return ban
+
+
+def list_room_bans(*, room: Room, actor: User):
+    require_room_admin_or_owner(room=room, user=actor)
+    return (
+        RoomBan.objects.filter(room=room, removed_at__isnull=True)
+        .select_related("user", "banned_by_user")
+        .order_by("-created_at", "-id")
+    )
+
+
+@transaction.atomic
+def remove_room_ban(*, room: Room, actor: User, target_user: User) -> None:
+    require_room_admin_or_owner(room=room, user=actor)
+    ban = (
+        RoomBan.objects.select_for_update()
+        .filter(room=room, user=target_user, removed_at__isnull=True)
+        .first()
+    )
+    if ban is None:
+        raise RoomBan.DoesNotExist
+    ban.removed_at = timezone.now()
+    ban.save(update_fields=["removed_at"])
+    ModerationEvent.objects.create(
+        action_type=ModerationActionType.MEMBER_UNBANNED,
+        actor_user=actor,
+        target_user=target_user,
+        room=room,
+    )
 
 
 def are_friends(*, user_a: User, user_b: User) -> bool:

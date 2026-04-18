@@ -5,19 +5,36 @@ from rest_framework import status
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from apps.chat.models import Room
+from apps.chat.models import Room, RoomInvitation
+from apps.chat.realtime import (
+    force_room_unsubscribe,
+    publish_dialog_message_created,
+    publish_dialog_message_deleted,
+    publish_dialog_message_updated,
+    publish_dialog_read_updated,
+    publish_room_invitation_created,
+    publish_room_membership_updated,
+    publish_room_message_created,
+    publish_room_message_deleted,
+    publish_room_message_updated,
+    publish_room_read_updated,
+)
 from apps.chat.serializers import (
     DialogCreateSerializer,
     MessageCreateSerializer,
     MessageUpdateSerializer,
     RoomCreateSerializer,
     RoomUpdateSerializer,
+    UserIdSerializer,
+    UsernameLookupSerializer,
     serialize_dialog_create,
     serialize_dialog_message,
     serialize_dialog_summary,
     serialize_joined_room_item,
+    serialize_room_ban,
     serialize_room_create,
     serialize_room_detail,
+    serialize_room_invitation,
     serialize_room_list_item,
     serialize_room_member,
     serialize_room_message,
@@ -27,12 +44,16 @@ from apps.chat.services import (
     DomainConflictError,
     DomainForbiddenError,
     DomainValidationError,
+    accept_room_invitation,
     create_dialog_message,
     create_room,
+    create_room_ban,
+    create_room_invitation,
     create_room_message,
     delete_dialog_message,
     delete_room,
     delete_room_message,
+    demote_room_admin,
     encode_cursor,
     get_dialog_for_user,
     get_or_create_dialog,
@@ -45,17 +66,40 @@ from apps.chat.services import (
     list_dialog_rows,
     list_joined_room_rows,
     list_public_rooms,
+    list_room_bans,
+    list_room_invitations,
     list_room_members,
     list_room_message_rows,
     mark_dialog_read,
     mark_room_read,
+    promote_room_admin,
+    reject_room_invitation,
+    remove_room_ban,
     update_dialog_message,
     update_room,
     update_room_message,
 )
 from apps.common.api import error_response, success_response
+from apps.common.enums import ModerationActionType
 
 User = get_user_model()
+
+
+def _not_found_response():
+    return error_response(
+        code="not_found",
+        message="The requested resource was not found.",
+        status_code=status.HTTP_404_NOT_FOUND,
+    )
+
+
+def _room_action_view(room_id, user):
+    room = Room.objects.filter(id=room_id).first()
+    if room is None:
+        raise Room.DoesNotExist
+    if room.visibility == "private" and get_user_room_role(room=room, user=user) == "none":
+        raise Room.DoesNotExist
+    return room
 
 
 class PublicRoomListView(APIView):
@@ -192,6 +236,7 @@ class RoomJoinView(APIView):
                 message=str(exc),
                 status_code=status.HTTP_409_CONFLICT,
             )
+        publish_room_membership_updated(room_id=room.id, user_id=request.user.id, action="joined")
         return Response(status=status.HTTP_204_NO_CONTENT)
 
 
@@ -218,6 +263,8 @@ class RoomLeaveView(APIView):
                 message=str(exc),
                 status_code=status.HTTP_409_CONFLICT,
             )
+        publish_room_membership_updated(room_id=room.id, user_id=request.user.id, action="left")
+        force_room_unsubscribe(user_id=request.user.id, room_id=room.id)
         return Response(status=status.HTTP_204_NO_CONTENT)
 
 
@@ -264,6 +311,270 @@ class RoomMemberListView(APIView):
                 },
             }
         )
+
+
+class RoomInvitationListCreateView(APIView):
+    def get(self, request, room_id):
+        try:
+            room = _room_action_view(room_id=room_id, user=request.user)
+            invitations = list_room_invitations(room=room, actor=request.user)
+        except Room.DoesNotExist:
+            return _not_found_response()
+        except DomainForbiddenError as exc:
+            return error_response(
+                code="forbidden",
+                message=str(exc),
+                status_code=status.HTTP_403_FORBIDDEN,
+            )
+        return success_response([serialize_room_invitation(item) for item in invitations])
+
+    def post(self, request, room_id):
+        serializer = UsernameLookupSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        invited_user = User.objects.filter(username=serializer.validated_data["username"]).first()
+        if invited_user is None:
+            return _not_found_response()
+        try:
+            room = _room_action_view(room_id=room_id, user=request.user)
+            invitation = create_room_invitation(
+                room=room,
+                actor=request.user,
+                invited_user=invited_user,
+            )
+        except Room.DoesNotExist:
+            return _not_found_response()
+        except DomainForbiddenError as exc:
+            return error_response(
+                code="forbidden",
+                message=str(exc),
+                status_code=status.HTTP_403_FORBIDDEN,
+            )
+        except DomainConflictError as exc:
+            return error_response(
+                code="conflict",
+                message=str(exc),
+                status_code=status.HTTP_409_CONFLICT,
+            )
+        except DomainValidationError as exc:
+            return error_response(
+                code="validation_error",
+                message="Validation failed.",
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                details={"message": [str(exc)]},
+            )
+        publish_room_invitation_created(invitation)
+        return success_response(
+            {"invitation": serialize_room_invitation(invitation)},
+            status.HTTP_201_CREATED,
+        )
+
+
+class RoomInvitationAcceptView(APIView):
+    def post(self, request, invitation_id):
+        try:
+            accept_room_invitation(invitation_id=invitation_id, actor=request.user)
+        except DomainForbiddenError as exc:
+            return error_response(
+                code="forbidden",
+                message=str(exc),
+                status_code=status.HTTP_403_FORBIDDEN,
+            )
+        except DomainConflictError as exc:
+            return error_response(
+                code="conflict",
+                message=str(exc),
+                status_code=status.HTTP_409_CONFLICT,
+            )
+        except Exception as exc:
+            if exc.__class__.__name__ == "DoesNotExist":
+                return _not_found_response()
+            raise
+        invitation = RoomInvitation.objects.filter(
+            id=invitation_id,
+            invited_user=request.user,
+        ).first()
+        if invitation is not None:
+            publish_room_membership_updated(
+                room_id=invitation.room_id,
+                user_id=request.user.id,
+                action="joined",
+            )
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
+
+class RoomInvitationRejectView(APIView):
+    def post(self, request, invitation_id):
+        try:
+            reject_room_invitation(invitation_id=invitation_id, actor=request.user)
+        except DomainConflictError as exc:
+            return error_response(
+                code="conflict",
+                message=str(exc),
+                status_code=status.HTTP_409_CONFLICT,
+            )
+        except Exception as exc:
+            if exc.__class__.__name__ == "DoesNotExist":
+                return _not_found_response()
+            raise
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
+
+class RoomAdminListView(APIView):
+    def post(self, request, room_id):
+        serializer = UserIdSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        target_user = User.objects.filter(id=serializer.validated_data["user_id"]).first()
+        if target_user is None:
+            return _not_found_response()
+        try:
+            room = _room_action_view(room_id=room_id, user=request.user)
+            promote_room_admin(room=room, actor=request.user, target_user=target_user)
+        except Room.DoesNotExist:
+            return _not_found_response()
+        except DomainForbiddenError as exc:
+            return error_response(
+                code="forbidden",
+                message=str(exc),
+                status_code=status.HTTP_403_FORBIDDEN,
+            )
+        except DomainConflictError as exc:
+            return error_response(
+                code="conflict",
+                message=str(exc),
+                status_code=status.HTTP_409_CONFLICT,
+            )
+        publish_room_membership_updated(room_id=room.id, user_id=target_user.id, action="removed")
+        force_room_unsubscribe(user_id=target_user.id, room_id=room.id)
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
+
+class RoomAdminDetailView(APIView):
+    def delete(self, request, room_id, user_id):
+        target_user = User.objects.filter(id=user_id).first()
+        if target_user is None:
+            return _not_found_response()
+        try:
+            room = _room_action_view(room_id=room_id, user=request.user)
+            demote_room_admin(room=room, actor=request.user, target_user=target_user)
+        except Room.DoesNotExist:
+            return _not_found_response()
+        except DomainForbiddenError as exc:
+            return error_response(
+                code="forbidden",
+                message=str(exc),
+                status_code=status.HTTP_403_FORBIDDEN,
+            )
+        except DomainConflictError as exc:
+            return error_response(
+                code="conflict",
+                message=str(exc),
+                status_code=status.HTTP_409_CONFLICT,
+            )
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
+
+class RoomRemoveMemberView(APIView):
+    def post(self, request, room_id):
+        serializer = UserIdSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        target_user = User.objects.filter(id=serializer.validated_data["user_id"]).first()
+        if target_user is None:
+            return _not_found_response()
+        try:
+            room = _room_action_view(room_id=room_id, user=request.user)
+            create_room_ban(
+                room=room,
+                actor=request.user,
+                target_user=target_user,
+                action_type=ModerationActionType.MEMBER_REMOVED,
+            )
+        except Room.DoesNotExist:
+            return _not_found_response()
+        except DomainForbiddenError as exc:
+            return error_response(
+                code="forbidden",
+                message=str(exc),
+                status_code=status.HTTP_403_FORBIDDEN,
+            )
+        except DomainConflictError as exc:
+            return error_response(
+                code="conflict",
+                message=str(exc),
+                status_code=status.HTTP_409_CONFLICT,
+            )
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
+
+class RoomBanListCreateView(APIView):
+    def get(self, request, room_id):
+        try:
+            room = _room_action_view(room_id=room_id, user=request.user)
+            bans = list_room_bans(room=room, actor=request.user)
+        except Room.DoesNotExist:
+            return _not_found_response()
+        except DomainForbiddenError as exc:
+            return error_response(
+                code="forbidden",
+                message=str(exc),
+                status_code=status.HTTP_403_FORBIDDEN,
+            )
+        return success_response([serialize_room_ban(item) for item in bans])
+
+    def post(self, request, room_id):
+        serializer = UserIdSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        target_user = User.objects.filter(id=serializer.validated_data["user_id"]).first()
+        if target_user is None:
+            return _not_found_response()
+        try:
+            room = _room_action_view(room_id=room_id, user=request.user)
+            ban = create_room_ban(
+                room=room,
+                actor=request.user,
+                target_user=target_user,
+                action_type=ModerationActionType.MEMBER_BANNED,
+            )
+        except Room.DoesNotExist:
+            return _not_found_response()
+        except DomainForbiddenError as exc:
+            return error_response(
+                code="forbidden",
+                message=str(exc),
+                status_code=status.HTTP_403_FORBIDDEN,
+            )
+        except DomainConflictError as exc:
+            return error_response(
+                code="conflict",
+                message=str(exc),
+                status_code=status.HTTP_409_CONFLICT,
+            )
+        publish_room_membership_updated(room_id=room.id, user_id=target_user.id, action="banned")
+        force_room_unsubscribe(user_id=target_user.id, room_id=room.id)
+        return success_response({"ban": serialize_room_ban(ban)}, status.HTTP_201_CREATED)
+
+
+class RoomBanDetailView(APIView):
+    def delete(self, request, room_id, user_id):
+        target_user = User.objects.filter(id=user_id).first()
+        if target_user is None:
+            return _not_found_response()
+        try:
+            room = _room_action_view(room_id=room_id, user=request.user)
+            remove_room_ban(room=room, actor=request.user, target_user=target_user)
+        except Room.DoesNotExist:
+            return _not_found_response()
+        except DomainForbiddenError as exc:
+            return error_response(
+                code="forbidden",
+                message=str(exc),
+                status_code=status.HTTP_403_FORBIDDEN,
+            )
+        except Exception as exc:
+            if exc.__class__.__name__ == "DoesNotExist":
+                return _not_found_response()
+            raise
+        publish_room_membership_updated(room_id=room.id, user_id=target_user.id, action="unbanned")
+        return Response(status=status.HTTP_204_NO_CONTENT)
 
 
 class DialogListCreateView(APIView):
@@ -368,6 +679,7 @@ class RoomMessageListCreateView(APIView):
                 status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
                 details={"message": [str(exc)]},
             )
+        publish_room_message_created(message)
         return success_response(
             {"message": serialize_room_message(message)}, status.HTTP_201_CREATED
         )
@@ -412,6 +724,7 @@ class RoomMessageDetailView(APIView):
                     status_code=status.HTTP_404_NOT_FOUND,
                 )
             raise
+        publish_room_message_updated(message)
         return success_response({"message": serialize_room_message(message)})
 
     def delete(self, request, room_id, message_id):
@@ -438,6 +751,7 @@ class RoomMessageDetailView(APIView):
                     status_code=status.HTTP_404_NOT_FOUND,
                 )
             raise
+        publish_room_message_deleted(room_id=room.id, message_id=message_id)
         return Response(status=status.HTTP_204_NO_CONTENT)
 
 
@@ -514,6 +828,7 @@ class DialogMessageListCreateView(APIView):
                     status_code=status.HTTP_404_NOT_FOUND,
                 )
             raise
+        publish_dialog_message_created(message)
         return success_response(
             {"message": serialize_dialog_message(message)}, status.HTTP_201_CREATED
         )
@@ -552,6 +867,7 @@ class DialogMessageDetailView(APIView):
                     status_code=status.HTTP_404_NOT_FOUND,
                 )
             raise
+        publish_dialog_message_updated(message)
         return success_response({"message": serialize_dialog_message(message)})
 
     def delete(self, request, dialog_id, message_id):
@@ -572,6 +888,7 @@ class DialogMessageDetailView(APIView):
                     status_code=status.HTTP_404_NOT_FOUND,
                 )
             raise
+        publish_dialog_message_deleted(dialog_id=dialog.id, message_id=message_id)
         return Response(status=status.HTTP_204_NO_CONTENT)
 
 
@@ -586,6 +903,7 @@ class RoomReadView(APIView):
                 message="The requested resource was not found.",
                 status_code=status.HTTP_404_NOT_FOUND,
             )
+        publish_room_read_updated(room_id=room.id, user_id=request.user.id, unread_count=0)
         return Response(status=status.HTTP_204_NO_CONTENT)
 
 
@@ -602,4 +920,5 @@ class DialogReadView(APIView):
                     status_code=status.HTTP_404_NOT_FOUND,
                 )
             raise
+        publish_dialog_read_updated(dialog_id=dialog.id, user_id=request.user.id, unread_count=0)
         return Response(status=status.HTTP_204_NO_CONTENT)

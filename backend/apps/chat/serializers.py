@@ -2,7 +2,15 @@ from django.contrib.auth import get_user_model
 from rest_framework import serializers
 
 from apps.accounts.serializers import serialize_public_user
-from apps.chat.models import Dialog, DialogMessage, Room, RoomMembership, RoomMessage
+from apps.chat.models import (
+    Dialog,
+    DialogMessage,
+    Room,
+    RoomBan,
+    RoomInvitation,
+    RoomMembership,
+    RoomMessage,
+)
 from apps.common.enums import ChatType, RoomVisibility
 
 User = get_user_model()
@@ -21,6 +29,14 @@ class RoomUpdateSerializer(serializers.Serializer):
 
 
 class DialogCreateSerializer(serializers.Serializer):
+    user_id = serializers.UUIDField()
+
+
+class UsernameLookupSerializer(serializers.Serializer):
+    username = serializers.CharField(max_length=150)
+
+
+class UserIdSerializer(serializers.Serializer):
     user_id = serializers.UUIDField()
 
 
@@ -123,6 +139,23 @@ def serialize_room_member(membership: RoomMembership) -> dict:
     return {
         "user": serialize_public_user(membership.user, include_presence=True),
         "role": membership.role,
+    }
+
+
+def serialize_room_invitation(invitation: RoomInvitation) -> dict:
+    return {
+        "id": str(invitation.id),
+        "room_id": str(invitation.room_id),
+        "user": serialize_public_user(invitation.invited_user, include_presence=False),
+        "created_at": _isoformat(invitation.created_at),
+    }
+
+
+def serialize_room_ban(ban: RoomBan) -> dict:
+    return {
+        "user": serialize_public_user(ban.user, include_presence=False),
+        "banned_by": serialize_public_user(ban.banned_by_user, include_presence=False),
+        "created_at": _isoformat(ban.created_at),
     }
 
 

@@ -1,0 +1,136 @@
+import pytest
+from django.contrib.auth import get_user_model
+from django.urls import reverse
+from rest_framework.test import APIClient
+
+from apps.chat.models import Dialog
+from apps.social.models import FriendRequest, Friendship, PeerBan
+
+User = get_user_model()
+
+
+@pytest.fixture
+def api_client() -> APIClient:
+    return APIClient()
+
+
+def create_user(*, email: str, username: str) -> User:
+    return User.objects.create_user(email=email, username=username, password="StrongPassword123!")
+
+
+def make_friends(user_a: User, user_b: User) -> Friendship:
+    user_low, user_high = sorted([user_a, user_b], key=lambda user: str(user.id))
+    return Friendship.objects.create(user_low=user_low, user_high=user_high)
+
+
+@pytest.mark.django_db
+def test_friend_request_list_and_accept_flow(api_client: APIClient) -> None:
+    alice = create_user(email="alice-social@example.com", username="alice-social")
+    bob = create_user(email="bob-social@example.com", username="bob-social")
+
+    alice_client = APIClient()
+    alice_client.force_login(alice)
+    bob_client = APIClient()
+    bob_client.force_login(bob)
+
+    create_response = alice_client.post(
+        reverse("friend-request-list-create"),
+        {"username": "bob-social", "message": "Let us connect"},
+        format="json",
+    )
+
+    assert create_response.status_code == 201
+    request_id = create_response.json()["data"]["friend_request"]["id"]
+
+    outgoing_response = alice_client.get(reverse("friend-request-outgoing-list"))
+    incoming_response = bob_client.get(reverse("friend-request-incoming-list"))
+
+    assert outgoing_response.status_code == 200
+    assert outgoing_response.json()["data"][0]["to_user"]["username"] == "bob-social"
+    assert incoming_response.status_code == 200
+    assert incoming_response.json()["data"][0]["from_user"]["username"] == "alice-social"
+
+    accept_response = bob_client.post(
+        reverse("friend-request-accept", kwargs={"request_id": request_id})
+    )
+
+    assert accept_response.status_code == 200
+    assert accept_response.json()["data"]["friendship"]["user"]["username"] == "alice-social"
+    assert Friendship.objects.count() == 1
+    friend_request = FriendRequest.objects.get(id=request_id)
+    assert friend_request.status == "accepted"
+
+
+@pytest.mark.django_db
+def test_friend_request_reject_and_conflict_rules(api_client: APIClient) -> None:
+    alice = create_user(email="alice-reject@example.com", username="alice-reject")
+    bob = create_user(email="bob-reject@example.com", username="bob-reject")
+    carol = create_user(email="carol-reject@example.com", username="carol-reject")
+    make_friends(alice, carol)
+    PeerBan.objects.create(source_user=bob, target_user=alice)
+
+    alice_client = APIClient()
+    alice_client.force_login(alice)
+    bob_client = APIClient()
+    bob_client.force_login(bob)
+
+    blocked_response = alice_client.post(
+        reverse("friend-request-list-create"),
+        {"username": "bob-reject"},
+        format="json",
+    )
+    assert blocked_response.status_code == 403
+
+    already_friend_response = alice_client.post(
+        reverse("friend-request-list-create"),
+        {"username": "carol-reject"},
+        format="json",
+    )
+    assert already_friend_response.status_code == 409
+
+    pending = FriendRequest.objects.create(from_user=alice, to_user=bob, message="hi")
+    reject_response = bob_client.post(
+        reverse("friend-request-reject", kwargs={"request_id": pending.id})
+    )
+    assert reject_response.status_code == 204
+    pending.refresh_from_db()
+    assert pending.status == "rejected"
+
+
+@pytest.mark.django_db
+def test_remove_friend_and_peer_ban_update_dialog_state(api_client: APIClient) -> None:
+    alice = create_user(email="alice-ban@example.com", username="alice-ban")
+    bob = create_user(email="bob-ban@example.com", username="bob-ban")
+    make_friends(alice, bob)
+    user_low, user_high = sorted([alice, bob], key=lambda user: str(user.id))
+    dialog = Dialog.objects.create(user_low=user_low, user_high=user_high)
+
+    alice_client = APIClient()
+    alice_client.force_login(alice)
+
+    remove_friend_response = alice_client.delete(
+        reverse("friend-detail", kwargs={"user_id": bob.id})
+    )
+    assert remove_friend_response.status_code == 204
+    dialog.refresh_from_db()
+    assert dialog.is_frozen is True
+
+    create_ban_response = alice_client.post(
+        reverse("peer-ban-list-create"),
+        {"user_id": str(bob.id)},
+        format="json",
+    )
+    assert create_ban_response.status_code == 201
+    assert PeerBan.objects.filter(source_user=alice, target_user=bob, removed_at__isnull=True).exists()
+    dialog.refresh_from_db()
+    assert dialog.is_frozen is True
+    assert Friendship.objects.exists() is False
+
+    list_response = alice_client.get(reverse("peer-ban-list-create"))
+    assert list_response.status_code == 200
+    assert list_response.json()["data"][0]["user"]["username"] == "bob-ban"
+
+    remove_ban_response = alice_client.delete(reverse("peer-ban-detail", kwargs={"user_id": bob.id}))
+    assert remove_ban_response.status_code == 204
+    dialog.refresh_from_db()
+    assert dialog.is_frozen is True

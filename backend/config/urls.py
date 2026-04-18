@@ -8,6 +8,8 @@ urlpatterns = [
     path("api/schema/", api_schema_view, name="api-schema"),
     path("api/docs/", swagger_ui_view, name="api-docs"),
     path("api/v1/", include("apps.accounts.urls")),
+    path("api/v1/", include("apps.presence.urls")),
+    path("api/v1/", include("apps.social.urls")),
     path("api/v1/", include("apps.chat.urls")),
     path("api/v1/", include("apps.attachments.urls")),
 ]
