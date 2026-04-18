@@ -63,7 +63,7 @@ Implementation MUST proceed through these milestones in order:
 ## M1. Repository Foundation and Local Execution
 
 ### T1.1 Create backend project scaffold
-**Status:** TODO
+**Status:** DONE
 
 #### Objective
 Create the initial project structure for the Python/Django backend aligned with repository constraints.
@@ -95,7 +95,7 @@ Create the initial project structure for the Python/Django backend aligned with 
 ---
 
 ### T1.2 Create Docker Compose local environment
-**Status:** TODO
+**Status:** DONE
 
 #### Objective
 Provide a local environment that can run the full project stack.
@@ -125,7 +125,7 @@ Provide a local environment that can run the full project stack.
 ---
 
 ### T1.3 Establish repository quality tooling
-**Status:** TODO
+**Status:** DONE
 
 #### Objective
 Add baseline development tooling needed for safe implementation.
@@ -150,7 +150,7 @@ Add baseline development tooling needed for safe implementation.
 ## M2. Data Model and Migrations
 
 ### T2.1 Read and map SCHEMA.md to implementation model
-**Status:** TODO
+**Status:** DONE
 
 #### Objective
 Translate `SCHEMA.md` into concrete application models and migration plan.
@@ -172,7 +172,7 @@ Translate `SCHEMA.md` into concrete application models and migration plan.
 ---
 
 ### T2.2 Implement core database models
-**Status:** TODO
+**Status:** DONE
 
 #### Objective
 Create the core persistent model layer.
@@ -217,7 +217,7 @@ At minimum, the implementation MUST support model concepts for:
 ---
 
 ### T2.3 Generate and verify migrations
-**Status:** TODO
+**Status:** DONE
 
 #### Objective
 Create the initial migration set for all required core entities.
@@ -244,7 +244,7 @@ Create the initial migration set for all required core entities.
 ## M3. Authentication and Session Management
 
 ### T3.1 Implement registration endpoint
-**Status:** TODO
+**Status:** DONE
 
 #### Endpoint
 - `POST /api/v1/auth/register`
@@ -1350,5 +1350,4 @@ When choosing between cleverness and maintainability, implementers MUST choose m
 This task plan exists to ensure the repository reaches a secure, testable, deployable, and spec-compliant implementation.
 
 ---
-
 

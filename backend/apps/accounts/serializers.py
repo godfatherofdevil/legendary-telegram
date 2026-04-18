@@ -63,6 +63,16 @@ def serialize_user(user: User, *, include_presence: bool, include_created_at: bo
     return payload
 
 
+def serialize_public_user(user: User, *, include_presence: bool) -> dict:
+    payload = {
+        "id": str(user.id),
+        "username": user.username,
+    }
+    if include_presence:
+        payload["presence"] = user.presence_state
+    return payload
+
+
 def serialize_session(
     session,
     *,

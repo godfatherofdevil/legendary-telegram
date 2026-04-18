@@ -210,6 +210,8 @@ Optional but useful:
 
 Docker is enough for the standard local workflow.
 
+Once the backend is running, Swagger documentation is available at `http://localhost:8000/api/docs/` and the machine-readable OpenAPI document is available at `http://localhost:8000/api/schema/`.
+
 ---
 
 ## 9. Environment Configuration

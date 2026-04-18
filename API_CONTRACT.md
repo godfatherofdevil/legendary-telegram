@@ -127,6 +127,23 @@ Usernames MUST be immutable after registration.
 
 All endpoints MUST be versioned under `/api/v1` and `/ws/v1`.
 
+### 3.1.1 Documentation Endpoints
+
+The backend MAY expose non-product documentation endpoints outside the versioned API namespace for developer discovery.
+
+Current documentation endpoints:
+
+```text
+/api/schema/
+/api/docs/
+```
+
+Rules:
+
+* `/api/schema/` returns an OpenAPI document for the currently implemented backend REST surface
+* `/api/docs/` serves a Swagger UI backed by `/api/schema/`
+* these endpoints do not change the versioning rules for product REST endpoints under `/api/v1`
+
 ### 3.2 Breaking Changes
 
 Breaking changes MUST NOT be introduced without a new version namespace.
@@ -3053,4 +3070,3 @@ An implementation is compliant only if:
 * WebSocket events reflect persisted state, not speculative state
 
 ---
-

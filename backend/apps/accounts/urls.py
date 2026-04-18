@@ -11,6 +11,8 @@ from apps.accounts.views import (
     ResetPasswordView,
     SessionDetailView,
     SessionListView,
+    UserByUsernameView,
+    UserProfileView,
 )
 
 urlpatterns = [
@@ -28,4 +30,6 @@ urlpatterns = [
     path("account", DeleteAccountView.as_view(), name="account-delete"),
     path("sessions", SessionListView.as_view(), name="session-list"),
     path("sessions/<uuid:session_id>", SessionDetailView.as_view(), name="session-detail"),
+    path("users/by-username/<str:username>", UserByUsernameView.as_view(), name="user-by-username"),
+    path("users/<uuid:user_id>", UserProfileView.as_view(), name="user-profile"),
 ]

@@ -12,6 +12,7 @@ from apps.accounts.serializers import (
     PasswordResetConfirmSerializer,
     PasswordResetRequestSerializer,
     RegistrationSerializer,
+    serialize_public_user,
     serialize_session,
     serialize_user,
 )
@@ -223,3 +224,27 @@ class SessionDetailView(APIView):
         if is_current:
             revoke_current_session(request)
         return Response(status=status.HTTP_204_NO_CONTENT)
+
+
+class UserProfileView(APIView):
+    def get(self, request, user_id: str):
+        user = User.objects.filter(id=user_id).first()
+        if user is None:
+            return error_response(
+                code="not_found",
+                message="The requested resource was not found.",
+                status_code=status.HTTP_404_NOT_FOUND,
+            )
+        return success_response({"user": serialize_public_user(user, include_presence=True)})
+
+
+class UserByUsernameView(APIView):
+    def get(self, request, username: str):
+        user = User.objects.filter(username=username).first()
+        if user is None:
+            return error_response(
+                code="not_found",
+                message="The requested resource was not found.",
+                status_code=status.HTTP_404_NOT_FOUND,
+            )
+        return success_response({"user": serialize_public_user(user, include_presence=True)})
