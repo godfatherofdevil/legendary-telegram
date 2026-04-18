@@ -8,34 +8,50 @@ from rest_framework.views import APIView
 from apps.chat.models import Room
 from apps.chat.serializers import (
     DialogCreateSerializer,
+    MessageCreateSerializer,
+    MessageUpdateSerializer,
     RoomCreateSerializer,
     RoomUpdateSerializer,
     serialize_dialog_create,
+    serialize_dialog_message,
     serialize_dialog_summary,
     serialize_joined_room_item,
     serialize_room_create,
     serialize_room_detail,
     serialize_room_list_item,
     serialize_room_member,
+    serialize_room_message,
     serialize_room_update,
 )
 from apps.chat.services import (
     DomainConflictError,
     DomainForbiddenError,
+    DomainValidationError,
+    create_dialog_message,
     create_room,
+    create_room_message,
+    delete_dialog_message,
     delete_room,
+    delete_room_message,
+    encode_cursor,
+    get_dialog_for_user,
     get_or_create_dialog,
     get_page_window,
     get_room_for_detail,
     get_user_room_role,
     join_room,
     leave_room,
+    list_dialog_message_rows,
     list_dialog_rows,
     list_joined_room_rows,
     list_public_rooms,
     list_room_members,
+    list_room_message_rows,
+    mark_dialog_read,
+    mark_room_read,
+    update_dialog_message,
     update_room,
-    encode_cursor,
+    update_room_message,
 )
 from apps.common.api import error_response, success_response
 
@@ -77,7 +93,9 @@ class JoinedRoomListView(APIView):
     def get(self, request):
         memberships, unread_counts = list_joined_room_rows(user=request.user)
         payload = [
-            serialize_joined_room_item(membership=membership, unread_count=unread_counts[membership.room_id])
+            serialize_joined_room_item(
+                membership=membership, unread_count=unread_counts[membership.room_id]
+            )
             for membership in memberships
         ]
         return success_response(payload)
@@ -237,7 +255,9 @@ class RoomMemberListView(APIView):
         has_next = len(memberships) > page.limit
         return Response(
             {
-                "data": [serialize_room_member(membership) for membership in memberships[: page.limit]],
+                "data": [
+                    serialize_room_member(membership) for membership in memberships[: page.limit]
+                ],
                 "pagination": {
                     "next_cursor": encode_cursor(page.offset + page.limit) if has_next else None,
                     "limit": page.limit,
@@ -251,7 +271,9 @@ class DialogListCreateView(APIView):
         dialogs, unread_counts, last_messages = list_dialog_rows(user=request.user)
         payload = []
         for dialog in dialogs:
-            other_user = dialog.user_high if dialog.user_low_id == request.user.id else dialog.user_low
+            other_user = (
+                dialog.user_high if dialog.user_low_id == request.user.id else dialog.user_low
+            )
             payload.append(
                 serialize_dialog_summary(
                     dialog=dialog,
@@ -273,7 +295,9 @@ class DialogListCreateView(APIView):
                 status_code=status.HTTP_404_NOT_FOUND,
             )
         try:
-            dialog, _created = get_or_create_dialog(current_user=request.user, other_user=other_user)
+            dialog, _created = get_or_create_dialog(
+                current_user=request.user, other_user=other_user
+            )
         except DomainForbiddenError as exc:
             return error_response(
                 code="forbidden",
@@ -281,3 +305,301 @@ class DialogListCreateView(APIView):
                 status_code=status.HTTP_403_FORBIDDEN,
             )
         return success_response({"dialog": serialize_dialog_create(dialog, other_user)})
+
+
+class RoomMessageListCreateView(APIView):
+    def get(self, request, room_id):
+        try:
+            page = get_page_window(
+                raw_limit=request.query_params.get("limit"),
+                raw_cursor=request.query_params.get("cursor"),
+                default_limit=50,
+                max_limit=100,
+            )
+            room = get_room_for_detail(room_id=room_id, user=request.user)
+            messages, has_next = list_room_message_rows(room=room, user=request.user, page=page)
+        except ValueError:
+            return error_response(
+                code="validation_error",
+                message="Validation failed.",
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                details={"cursor": ["Invalid pagination parameters."]},
+            )
+        except Room.DoesNotExist:
+            return error_response(
+                code="not_found",
+                message="The requested resource was not found.",
+                status_code=status.HTTP_404_NOT_FOUND,
+            )
+        return Response(
+            {
+                "data": [serialize_room_message(message) for message in messages],
+                "pagination": {
+                    "next_cursor": encode_cursor(page.offset + page.limit) if has_next else None,
+                    "limit": page.limit,
+                },
+            }
+        )
+
+    def post(self, request, room_id):
+        serializer = MessageCreateSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        try:
+            room = get_room_for_detail(room_id=room_id, user=request.user)
+            message = create_room_message(
+                room=room,
+                sender=request.user,
+                text=serializer.validated_data.get("text"),
+                reply_to_message_id=serializer.validated_data.get("reply_to_message_id"),
+                attachment_ids=[
+                    str(value) for value in serializer.validated_data.get("attachment_ids", [])
+                ],
+            )
+        except Room.DoesNotExist:
+            return error_response(
+                code="not_found",
+                message="The requested resource was not found.",
+                status_code=status.HTTP_404_NOT_FOUND,
+            )
+        except DomainValidationError as exc:
+            return error_response(
+                code="validation_error",
+                message="Validation failed.",
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                details={"message": [str(exc)]},
+            )
+        return success_response(
+            {"message": serialize_room_message(message)}, status.HTTP_201_CREATED
+        )
+
+
+class RoomMessageDetailView(APIView):
+    def patch(self, request, room_id, message_id):
+        serializer = MessageUpdateSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        try:
+            room = get_room_for_detail(room_id=room_id, user=request.user)
+            message = update_room_message(
+                room=room,
+                message_id=message_id,
+                actor=request.user,
+                text=serializer.validated_data.get("text"),
+            )
+        except Room.DoesNotExist:
+            return error_response(
+                code="not_found",
+                message="The requested resource was not found.",
+                status_code=status.HTTP_404_NOT_FOUND,
+            )
+        except DomainForbiddenError as exc:
+            return error_response(
+                code="forbidden",
+                message=str(exc),
+                status_code=status.HTTP_403_FORBIDDEN,
+            )
+        except DomainValidationError as exc:
+            return error_response(
+                code="validation_error",
+                message="Validation failed.",
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                details={"message": [str(exc)]},
+            )
+        except Exception as exc:
+            if exc.__class__.__name__ == "DoesNotExist":
+                return error_response(
+                    code="not_found",
+                    message="The requested resource was not found.",
+                    status_code=status.HTTP_404_NOT_FOUND,
+                )
+            raise
+        return success_response({"message": serialize_room_message(message)})
+
+    def delete(self, request, room_id, message_id):
+        try:
+            room = get_room_for_detail(room_id=room_id, user=request.user)
+            delete_room_message(room=room, message_id=message_id, actor=request.user)
+        except Room.DoesNotExist:
+            return error_response(
+                code="not_found",
+                message="The requested resource was not found.",
+                status_code=status.HTTP_404_NOT_FOUND,
+            )
+        except DomainForbiddenError as exc:
+            return error_response(
+                code="forbidden",
+                message=str(exc),
+                status_code=status.HTTP_403_FORBIDDEN,
+            )
+        except Exception as exc:
+            if exc.__class__.__name__ == "DoesNotExist":
+                return error_response(
+                    code="not_found",
+                    message="The requested resource was not found.",
+                    status_code=status.HTTP_404_NOT_FOUND,
+                )
+            raise
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
+
+class DialogMessageListCreateView(APIView):
+    def get(self, request, dialog_id):
+        try:
+            page = get_page_window(
+                raw_limit=request.query_params.get("limit"),
+                raw_cursor=request.query_params.get("cursor"),
+                default_limit=50,
+                max_limit=100,
+            )
+            dialog = get_dialog_for_user(dialog_id=dialog_id, user=request.user)
+            messages, has_next = list_dialog_message_rows(
+                dialog=dialog, user=request.user, page=page
+            )
+        except ValueError:
+            return error_response(
+                code="validation_error",
+                message="Validation failed.",
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                details={"cursor": ["Invalid pagination parameters."]},
+            )
+        except Exception as exc:
+            if exc.__class__.__name__ == "DoesNotExist":
+                return error_response(
+                    code="not_found",
+                    message="The requested resource was not found.",
+                    status_code=status.HTTP_404_NOT_FOUND,
+                )
+            raise
+        return Response(
+            {
+                "data": [serialize_dialog_message(message) for message in messages],
+                "pagination": {
+                    "next_cursor": encode_cursor(page.offset + page.limit) if has_next else None,
+                    "limit": page.limit,
+                },
+            }
+        )
+
+    def post(self, request, dialog_id):
+        serializer = MessageCreateSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        try:
+            dialog = get_dialog_for_user(dialog_id=dialog_id, user=request.user)
+            message = create_dialog_message(
+                dialog=dialog,
+                sender=request.user,
+                text=serializer.validated_data.get("text"),
+                reply_to_message_id=serializer.validated_data.get("reply_to_message_id"),
+                attachment_ids=[
+                    str(value) for value in serializer.validated_data.get("attachment_ids", [])
+                ],
+            )
+        except DomainForbiddenError as exc:
+            return error_response(
+                code="forbidden",
+                message=str(exc),
+                status_code=status.HTTP_403_FORBIDDEN,
+            )
+        except DomainValidationError as exc:
+            return error_response(
+                code="validation_error",
+                message="Validation failed.",
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                details={"message": [str(exc)]},
+            )
+        except Exception as exc:
+            if exc.__class__.__name__ == "DoesNotExist":
+                return error_response(
+                    code="not_found",
+                    message="The requested resource was not found.",
+                    status_code=status.HTTP_404_NOT_FOUND,
+                )
+            raise
+        return success_response(
+            {"message": serialize_dialog_message(message)}, status.HTTP_201_CREATED
+        )
+
+
+class DialogMessageDetailView(APIView):
+    def patch(self, request, dialog_id, message_id):
+        serializer = MessageUpdateSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        try:
+            dialog = get_dialog_for_user(dialog_id=dialog_id, user=request.user)
+            message = update_dialog_message(
+                dialog=dialog,
+                message_id=message_id,
+                actor=request.user,
+                text=serializer.validated_data.get("text"),
+            )
+        except DomainForbiddenError as exc:
+            return error_response(
+                code="forbidden",
+                message=str(exc),
+                status_code=status.HTTP_403_FORBIDDEN,
+            )
+        except DomainValidationError as exc:
+            return error_response(
+                code="validation_error",
+                message="Validation failed.",
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                details={"message": [str(exc)]},
+            )
+        except Exception as exc:
+            if exc.__class__.__name__ == "DoesNotExist":
+                return error_response(
+                    code="not_found",
+                    message="The requested resource was not found.",
+                    status_code=status.HTTP_404_NOT_FOUND,
+                )
+            raise
+        return success_response({"message": serialize_dialog_message(message)})
+
+    def delete(self, request, dialog_id, message_id):
+        try:
+            dialog = get_dialog_for_user(dialog_id=dialog_id, user=request.user)
+            delete_dialog_message(dialog=dialog, message_id=message_id, actor=request.user)
+        except DomainForbiddenError as exc:
+            return error_response(
+                code="forbidden",
+                message=str(exc),
+                status_code=status.HTTP_403_FORBIDDEN,
+            )
+        except Exception as exc:
+            if exc.__class__.__name__ == "DoesNotExist":
+                return error_response(
+                    code="not_found",
+                    message="The requested resource was not found.",
+                    status_code=status.HTTP_404_NOT_FOUND,
+                )
+            raise
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
+
+class RoomReadView(APIView):
+    def post(self, request, room_id):
+        try:
+            room = get_room_for_detail(room_id=room_id, user=request.user)
+            mark_room_read(room=room, user=request.user)
+        except Room.DoesNotExist:
+            return error_response(
+                code="not_found",
+                message="The requested resource was not found.",
+                status_code=status.HTTP_404_NOT_FOUND,
+            )
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
+
+class DialogReadView(APIView):
+    def post(self, request, dialog_id):
+        try:
+            dialog = get_dialog_for_user(dialog_id=dialog_id, user=request.user)
+            mark_dialog_read(dialog=dialog, user=request.user)
+        except Exception as exc:
+            if exc.__class__.__name__ == "DoesNotExist":
+                return error_response(
+                    code="not_found",
+                    message="The requested resource was not found.",
+                    status_code=status.HTTP_404_NOT_FOUND,
+                )
+            raise
+        return Response(status=status.HTTP_204_NO_CONTENT)

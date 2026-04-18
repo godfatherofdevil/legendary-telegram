@@ -2,8 +2,8 @@ from django.contrib.auth import get_user_model
 from rest_framework import serializers
 
 from apps.accounts.serializers import serialize_public_user
-from apps.chat.models import Dialog, DialogMessage, Room, RoomMembership
-from apps.common.enums import RoomVisibility
+from apps.chat.models import Dialog, DialogMessage, Room, RoomMembership, RoomMessage
+from apps.common.enums import ChatType, RoomVisibility
 
 User = get_user_model()
 
@@ -22,6 +22,20 @@ class RoomUpdateSerializer(serializers.Serializer):
 
 class DialogCreateSerializer(serializers.Serializer):
     user_id = serializers.UUIDField()
+
+
+class MessageCreateSerializer(serializers.Serializer):
+    text = serializers.CharField(required=False, allow_blank=True, allow_null=True)
+    reply_to_message_id = serializers.UUIDField(required=False, allow_null=True)
+    attachment_ids = serializers.ListField(
+        child=serializers.UUIDField(),
+        required=False,
+        allow_empty=True,
+    )
+
+
+class MessageUpdateSerializer(serializers.Serializer):
+    text = serializers.CharField(required=False, allow_blank=True, allow_null=True)
 
 
 def _isoformat(value):
@@ -112,7 +126,9 @@ def serialize_room_member(membership: RoomMembership) -> dict:
     }
 
 
-def serialize_dialog_summary(*, dialog: Dialog, other_user: User, unread_count: int, last_message: DialogMessage | None) -> dict:
+def serialize_dialog_summary(
+    *, dialog: Dialog, other_user: User, unread_count: int, last_message: DialogMessage | None
+) -> dict:
     payload = {
         "id": str(dialog.id),
         "other_user": serialize_public_user(other_user, include_presence=True),
@@ -138,3 +154,51 @@ def serialize_dialog_create(dialog: Dialog, other_user: User) -> dict:
         "is_frozen": dialog.is_frozen,
         "created_at": _isoformat(dialog.created_at),
     }
+
+
+def serialize_message_attachment(attachment) -> dict:
+    return {
+        "id": str(attachment.id),
+        "filename": attachment.original_filename,
+        "content_type": attachment.content_type,
+        "size_bytes": attachment.size_bytes,
+        "comment": attachment.comment,
+        "download_url": f"/api/v1/attachments/{attachment.id}/download",
+    }
+
+
+def serialize_message_reply(reply_to_message) -> dict | None:
+    if reply_to_message is None:
+        return None
+    return {
+        "id": str(reply_to_message.id),
+        "sender": serialize_public_user(reply_to_message.sender_user, include_presence=False),
+        "text": reply_to_message.text or "",
+    }
+
+
+def _serialize_message(*, message, chat_type: str, chat_id) -> dict:
+    attachments = [
+        serialize_message_attachment(binding.attachment)
+        for binding in getattr(message, "attachment_bindings").all()
+    ]
+    return {
+        "id": str(message.id),
+        "chat_type": chat_type,
+        "chat_id": str(chat_id),
+        "sender": serialize_public_user(message.sender_user, include_presence=False),
+        "text": message.text or "",
+        "reply_to": serialize_message_reply(message.reply_to_message),
+        "attachments": attachments,
+        "is_edited": message.is_edited,
+        "created_at": _isoformat(message.created_at),
+        "updated_at": _isoformat(message.updated_at),
+    }
+
+
+def serialize_room_message(message: RoomMessage) -> dict:
+    return _serialize_message(message=message, chat_type=ChatType.ROOM, chat_id=message.room_id)
+
+
+def serialize_dialog_message(message: DialogMessage) -> dict:
+    return _serialize_message(message=message, chat_type=ChatType.DIALOG, chat_id=message.dialog_id)

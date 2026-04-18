@@ -1,6 +1,8 @@
 import os
+import signal
 import subprocess
 import sys
+import time
 from pathlib import Path
 
 import pytest
@@ -88,3 +90,126 @@ def test_reset_sqlite_database_removes_existing_file(tmp_path) -> None:
     startup.reset_sqlite_database({"NAME": str(database_path)})
 
     assert not database_path.exists()
+
+
+def _write_fake_executable(path: Path, contents: str) -> None:
+    path.write_text(contents, encoding="utf-8")
+    path.chmod(0o755)
+
+
+def _wait_for_log_line(log_path: Path, expected_line: str, timeout: float = 3.0) -> None:
+    deadline = time.monotonic() + timeout
+    while time.monotonic() < deadline:
+        if log_path.exists():
+            lines = log_path.read_text(encoding="utf-8").splitlines()
+            if expected_line in lines:
+                return
+        time.sleep(0.05)
+
+    pytest.fail(f"Timed out waiting for {expected_line!r} in {log_path}")
+
+
+def test_entrypoint_forwards_sigint_during_startup(tmp_path) -> None:
+    backend_dir = Path(__file__).resolve().parents[3]
+    bin_dir = tmp_path / "bin"
+    bin_dir.mkdir()
+    event_log = tmp_path / "events.log"
+
+    _write_fake_executable(
+        bin_dir / "python",
+        """#!/bin/sh
+set -eu
+if [ "${1:-}" = "-m" ] && [ "${2:-}" = "config.startup" ]; then
+    trap 'echo startup-interrupted >> "$TEST_EVENT_LOG"; exit 130' INT TERM HUP QUIT
+    echo startup-begin >> "$TEST_EVENT_LOG"
+    while :; do
+        sleep 0.1
+    done
+fi
+exit 1
+""",
+    )
+    _write_fake_executable(
+        bin_dir / "daphne",
+        """#!/bin/sh
+set -eu
+echo daphne-begin >> "$TEST_EVENT_LOG"
+exit 0
+""",
+    )
+
+    env = {
+        **os.environ,
+        "TEST_EVENT_LOG": str(event_log),
+        "BACKEND_STARTUP_COMMAND": str(bin_dir / "python") + " -m config.startup",
+        "BACKEND_SERVER_COMMAND": str(bin_dir / "daphne"),
+    }
+
+    process = subprocess.Popen(
+        ["/bin/sh", str(backend_dir / "entrypoint.sh")],
+        cwd=backend_dir,
+        env=env,
+        text=True,
+    )
+    _wait_for_log_line(event_log, "startup-begin")
+
+    process.send_signal(signal.SIGINT)
+    return_code = process.wait(timeout=3)
+
+    lines = event_log.read_text(encoding="utf-8").splitlines()
+    assert return_code != 0
+    assert "startup-interrupted" in lines
+    assert "daphne-begin" not in lines
+
+
+def test_entrypoint_forwards_sigint_to_daphne(tmp_path) -> None:
+    backend_dir = Path(__file__).resolve().parents[3]
+    bin_dir = tmp_path / "bin"
+    bin_dir.mkdir()
+    event_log = tmp_path / "events.log"
+
+    _write_fake_executable(
+        bin_dir / "python",
+        """#!/bin/sh
+set -eu
+if [ "${1:-}" = "-m" ] && [ "${2:-}" = "config.startup" ]; then
+    echo startup-complete >> "$TEST_EVENT_LOG"
+    exit 0
+fi
+exit 1
+""",
+    )
+    _write_fake_executable(
+        bin_dir / "daphne",
+        """#!/bin/sh
+set -eu
+trap 'echo daphne-interrupted >> "$TEST_EVENT_LOG"; exit 130' INT TERM HUP QUIT
+echo daphne-begin >> "$TEST_EVENT_LOG"
+while :; do
+    sleep 0.1
+done
+""",
+    )
+
+    env = {
+        **os.environ,
+        "TEST_EVENT_LOG": str(event_log),
+        "BACKEND_STARTUP_COMMAND": str(bin_dir / "python") + " -m config.startup",
+        "BACKEND_SERVER_COMMAND": str(bin_dir / "daphne"),
+    }
+
+    process = subprocess.Popen(
+        ["/bin/sh", str(backend_dir / "entrypoint.sh")],
+        cwd=backend_dir,
+        env=env,
+        text=True,
+    )
+    _wait_for_log_line(event_log, "daphne-begin")
+
+    process.send_signal(signal.SIGINT)
+    return_code = process.wait(timeout=3)
+
+    lines = event_log.read_text(encoding="utf-8").splitlines()
+    assert return_code != 0
+    assert "startup-complete" in lines
+    assert "daphne-interrupted" in lines
