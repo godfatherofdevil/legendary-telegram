@@ -472,6 +472,7 @@ def test_room_message_history_send_reply_edit_delete_and_read_flow(api_client: A
     )
     assert delete_response.status_code == 204
     assert RoomMessage.objects.filter(id=created_message.id).exists() is False
+    assert Attachment.objects.filter(id=attachment.id).exists() is False
 
     mark_read_response = owner_client.post(reverse("room-read", kwargs={"room_id": room.id}))
     assert mark_read_response.status_code == 204
@@ -635,6 +636,7 @@ def test_dialog_message_send_history_edit_delete_and_read_flow(api_client: APICl
         )
     )
     assert delete_response.status_code == 204
+    assert Attachment.objects.filter(id=attachment.id).exists() is False
 
     mark_read_response = bob_client.post(reverse("dialog-read", kwargs={"dialog_id": dialog.id}))
     assert mark_read_response.status_code == 204

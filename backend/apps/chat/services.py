@@ -9,6 +9,10 @@ from django.shortcuts import get_object_or_404
 from django.utils import timezone
 
 from apps.attachments.models import Attachment, DialogMessageAttachment, RoomMessageAttachment
+from apps.attachments.services import (
+    delete_dialog_message_attachments,
+    delete_room_message_attachments,
+)
 from apps.audit.models import ModerationEvent
 from apps.chat.models import (
     Dialog,
@@ -513,6 +517,7 @@ def delete_room_message(*, room: Room, message_id, actor: User) -> None:
         room=room,
         room_message=message,
     )
+    delete_room_message_attachments(message=message)
     message.delete()
 
 
@@ -597,6 +602,7 @@ def delete_dialog_message(*, dialog: Dialog, message_id, actor: User) -> None:
         dialog=dialog,
         dialog_message=message,
     )
+    delete_dialog_message_attachments(message=message)
     message.delete()
     Dialog.objects.filter(id=dialog.id).update(updated_at=timezone.now())
 

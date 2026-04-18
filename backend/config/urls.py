@@ -9,4 +9,5 @@ urlpatterns = [
     path("api/docs/", swagger_ui_view, name="api-docs"),
     path("api/v1/", include("apps.accounts.urls")),
     path("api/v1/", include("apps.chat.urls")),
+    path("api/v1/", include("apps.attachments.urls")),
 ]

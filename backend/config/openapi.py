@@ -93,6 +93,7 @@ def build_openapi_schema(request) -> dict:
             {"name": "Users"},
             {"name": "Rooms"},
             {"name": "Dialogs"},
+            {"name": "Attachments"},
             {"name": "Documentation"},
         ],
         "paths": {
@@ -345,6 +346,72 @@ def build_openapi_schema(request) -> dict:
                     response_description="Dialog payload.",
                     request_body=_json_request_body(["user_id"]),
                 ),
+            },
+            "/api/v1/attachments": {
+                "post": _operation(
+                    summary="Upload attachment",
+                    tags=["Attachments"],
+                    description="Uploads a new unbound attachment for later message binding.",
+                    response_description="Created attachment payload.",
+                    request_body={
+                        "required": True,
+                        "content": {
+                            "multipart/form-data": {
+                                "schema": {
+                                    "type": "object",
+                                    "required": ["file"],
+                                }
+                            }
+                        },
+                    },
+                    status_code="201",
+                )
+            },
+            "/api/v1/attachments/{attachment_id}": {
+                "get": _operation(
+                    summary="Get attachment metadata",
+                    tags=["Attachments"],
+                    description=(
+                        "Returns attachment metadata when the authenticated user is authorized."
+                    ),
+                    response_description="Attachment metadata payload.",
+                    parameters=[
+                        _path_parameter(
+                            "attachment_id",
+                            "Attachment identifier.",
+                            schema_format="uuid",
+                        )
+                    ],
+                ),
+                "delete": _operation(
+                    summary="Delete unbound attachment",
+                    tags=["Attachments"],
+                    description="Deletes an unbound attachment owned by the authenticated user.",
+                    response_description="Attachment deleted.",
+                    parameters=[
+                        _path_parameter(
+                            "attachment_id",
+                            "Attachment identifier.",
+                            schema_format="uuid",
+                        )
+                    ],
+                    status_code="204",
+                ),
+            },
+            "/api/v1/attachments/{attachment_id}/download": {
+                "get": _operation(
+                    summary="Download attachment",
+                    tags=["Attachments"],
+                    description="Streams the attachment when the authenticated user is authorized.",
+                    response_description="Attachment download stream.",
+                    parameters=[
+                        _path_parameter(
+                            "attachment_id",
+                            "Attachment identifier.",
+                            schema_format="uuid",
+                        )
+                    ],
+                )
             },
         },
         "externalDocs": {

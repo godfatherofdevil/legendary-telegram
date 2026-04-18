@@ -17,6 +17,7 @@ def test_openapi_schema_endpoint_is_public_and_lists_backend_routes(api_client: 
     assert payload["openapi"] == "3.0.3"
     assert "/api/v1/auth/login" in payload["paths"]
     assert "/api/v1/rooms/{room_id}" in payload["paths"]
+    assert "/api/v1/attachments/{attachment_id}" in payload["paths"]
     assert payload["components"]["securitySchemes"]["sessionAuth"]["in"] == "cookie"
 
 
