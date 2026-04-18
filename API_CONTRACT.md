@@ -265,7 +265,33 @@ List endpoints returning potentially large collections MUST support cursor pagin
 
 ## 7. Authentication API
 
-## 7.1 Register
+## 7.1 Session Status
+
+### Endpoint
+
+```http
+GET /api/v1/auth/session-status
+```
+
+### Behavior
+
+* MUST be callable without authentication
+* MUST report whether the current browser session is authenticated
+* MUST be safe to use before login or registration
+
+### Response
+
+```json
+{
+  "data": {
+    "authenticated": false
+  }
+}
+```
+
+---
+
+## 7.2 Register
 
 ### Endpoint
 
@@ -319,7 +345,7 @@ POST /api/v1/auth/register
 
 ---
 
-## 7.2 Login
+## 7.3 Login
 
 ### Endpoint
 
@@ -374,7 +400,7 @@ POST /api/v1/auth/login
 
 ---
 
-## 7.3 Logout Current Session
+## 7.4 Logout Current Session
 
 ### Endpoint
 
@@ -394,7 +420,7 @@ POST /api/v1/auth/logout
 
 ---
 
-## 7.4 Get Current Authenticated User
+## 7.5 Get Current Authenticated User
 
 ### Endpoint
 
@@ -424,7 +450,7 @@ GET /api/v1/auth/me
 
 ---
 
-## 7.5 Change Password
+## 7.6 Change Password
 
 ### Endpoint
 
@@ -455,7 +481,7 @@ POST /api/v1/auth/change-password
 
 ---
 
-## 7.6 Request Password Reset
+## 7.7 Request Password Reset
 
 ### Endpoint
 
@@ -488,7 +514,7 @@ POST /api/v1/auth/request-password-reset
 
 ---
 
-## 7.7 Confirm Password Reset
+## 7.8 Confirm Password Reset
 
 ### Endpoint
 
@@ -519,7 +545,7 @@ POST /api/v1/auth/reset-password
 
 ---
 
-## 7.8 Delete Account
+## 7.9 Delete Account
 
 ### Endpoint
 

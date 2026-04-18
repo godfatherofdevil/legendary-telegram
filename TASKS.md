@@ -1090,7 +1090,7 @@ Create service logic for room message lifecycle.
 
 ## M11. Deployment Hardening
 
-### T11.1 Align deployment with DEPLOYEMENT.md
+### T11.1 Align deployment with DEPLOYMENT.md
 **Status:** TODO
 
 #### Requirements

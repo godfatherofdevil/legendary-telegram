@@ -234,6 +234,8 @@ FRONTEND_PORT=3000
 DJANGO_SECRET_KEY=local-dev-secret-key
 DJANGO_DEBUG=1
 DJANGO_ALLOWED_HOSTS=localhost,127.0.0.1,backend
+DJANGO_CSRF_TRUSTED_ORIGINS=http://localhost:3000,http://127.0.0.1:3000
+DJANGO_CORS_ALLOWED_ORIGINS=http://localhost:3000,http://127.0.0.1:3000
 
 DATABASE_URL=postgresql://chat_user:chat_password@postgres:5432/chat_app
 REDIS_URL=redis://redis:6379/0

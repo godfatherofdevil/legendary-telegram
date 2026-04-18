@@ -12,11 +12,6 @@ class RegistrationSerializer(serializers.Serializer):
     def validate_email(self, value: str) -> str:
         return User.objects.normalize_email(value)
 
-    def validate(self, attrs):
-        user = User(email=attrs["email"], username=attrs["username"])
-        password_validation.validate_password(attrs["password"], user)
-        return attrs
-
 
 class LoginSerializer(serializers.Serializer):
     email = serializers.EmailField()

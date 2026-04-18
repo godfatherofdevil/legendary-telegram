@@ -9,6 +9,7 @@ from apps.accounts.views import (
     RegisterView,
     RequestPasswordResetView,
     ResetPasswordView,
+    SessionStatusView,
     SessionDetailView,
     SessionListView,
     UserByUsernameView,
@@ -17,6 +18,7 @@ from apps.accounts.views import (
 
 urlpatterns = [
     path("auth/register", RegisterView.as_view(), name="auth-register"),
+    path("auth/session-status", SessionStatusView.as_view(), name="auth-session-status"),
     path("auth/login", LoginView.as_view(), name="auth-login"),
     path("auth/logout", LogoutView.as_view(), name="auth-logout"),
     path("auth/me", MeView.as_view(), name="auth-me"),

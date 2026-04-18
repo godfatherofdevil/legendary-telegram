@@ -3,6 +3,7 @@ from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.core import mail
 from django.urls import reverse
+from django.test import override_settings
 from rest_framework.test import APIClient
 
 from apps.accounts.models import PasswordResetToken, UserSession
@@ -32,6 +33,53 @@ def test_register_success(api_client: APIClient) -> None:
 
     assert response.status_code == 201
     assert response.json()["data"]["user"]["email"] == "alice@example.com"
+
+
+@pytest.mark.django_db
+def test_register_accepts_contract_valid_password_payload(api_client: APIClient) -> None:
+    response = api_client.post(
+        reverse("auth-register"),
+        {"email": "bob@example.com", "username": "bob", "password": "password"},
+        format="json",
+    )
+
+    assert response.status_code == 201
+    assert response.json()["data"]["user"]["username"] == "bob"
+
+
+@override_settings(CORS_ALLOWED_ORIGINS=["http://localhost:3000"], CORS_ALLOW_CREDENTIALS=True)
+@pytest.mark.django_db
+def test_register_options_preflight_returns_cors_headers(api_client: APIClient) -> None:
+    response = api_client.options(
+        reverse("auth-register"),
+        HTTP_ORIGIN="http://localhost:3000",
+        HTTP_ACCESS_CONTROL_REQUEST_METHOD="POST",
+        HTTP_ACCESS_CONTROL_REQUEST_HEADERS="content-type,x-csrftoken",
+    )
+
+    assert response.status_code == 200
+    assert response["Access-Control-Allow-Origin"] == "http://localhost:3000"
+    assert response["Access-Control-Allow-Credentials"] == "true"
+
+
+@pytest.mark.django_db
+def test_session_status_is_anonymous_safe_and_sets_csrf_cookie(api_client: APIClient) -> None:
+    response = api_client.get(reverse("auth-session-status"))
+
+    assert response.status_code == 200
+    assert response.json()["data"] == {"authenticated": False}
+    assert "csrftoken" in response.cookies
+
+
+@pytest.mark.django_db
+def test_session_status_returns_authenticated_for_logged_in_user(api_client: APIClient) -> None:
+    user = create_user()
+    api_client.force_login(user)
+
+    response = api_client.get(reverse("auth-session-status"))
+
+    assert response.status_code == 200
+    assert response.json()["data"] == {"authenticated": True}
 
 
 @pytest.mark.django_db
@@ -103,6 +151,7 @@ def test_me_returns_current_user(api_client: APIClient) -> None:
 def test_me_rejects_unauthenticated_requests(api_client: APIClient) -> None:
     response = api_client.get(reverse("auth-me"))
     assert response.status_code == 401
+    assert "csrftoken" in response.cookies
 
 
 @pytest.mark.django_db

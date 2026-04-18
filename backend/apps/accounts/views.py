@@ -64,6 +64,14 @@ class RegisterView(APIView):
         )
 
 
+class SessionStatusView(APIView):
+    permission_classes = [permissions.AllowAny]
+
+    def get(self, request):
+        is_authenticated = bool(getattr(request.user, "is_authenticated", False))
+        return success_response({"authenticated": is_authenticated})
+
+
 class LoginView(APIView):
     permission_classes = [permissions.AllowAny]
 
