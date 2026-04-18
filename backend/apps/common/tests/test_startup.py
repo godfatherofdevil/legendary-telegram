@@ -6,7 +6,7 @@ from pathlib import Path
 import pytest
 from django.core.management import call_command
 from django.db.migrations.exceptions import InconsistentMigrationHistory
-from django.urls import Resolver404, resolve
+from django.urls import resolve
 
 from config import startup
 
@@ -41,12 +41,9 @@ def test_admin_route_is_registered() -> None:
     assert match is not None
 
 
-def test_unconfigured_api_namespace_is_not_exposed() -> None:
-    try:
-        resolve("/api/v1/auth/login")
-    except Resolver404:
-        return
-    raise AssertionError("Contract routes should not exist until implemented.")
+def test_auth_login_route_is_registered() -> None:
+    match = resolve("/api/v1/auth/login")
+    assert match is not None
 
 
 def test_run_startup_migrations_recovers_known_inconsistent_history(monkeypatch) -> None:
