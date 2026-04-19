@@ -27,7 +27,7 @@ class AttachmentStorage:
     ) -> None:
         raise NotImplementedError
 
-    def open(self, *, storage_key: str) -> BinaryIO:
+    def open(self, *, storage_key: str, byte_range: tuple[int, int] | None = None) -> BinaryIO:
         raise NotImplementedError
 
     def exists(self, *, storage_key: str) -> bool:
@@ -78,11 +78,15 @@ class LocalFilesystemAttachmentStorage(AttachmentStorage):
             original_filename=original_filename,
         )
 
-    def open(self, *, storage_key: str) -> BinaryIO:
+    def open(self, *, storage_key: str, byte_range: tuple[int, int] | None = None) -> BinaryIO:
         path = attachment_absolute_path(storage_key)
         if not path.exists():
             raise AttachmentObjectNotFoundError(storage_key)
-        return path.open("rb")
+        file_handle = path.open("rb")
+        if byte_range is not None:
+            start, _end = byte_range
+            file_handle.seek(start)
+        return file_handle
 
     def exists(self, *, storage_key: str) -> bool:
         return attachment_absolute_path(storage_key).exists()
@@ -203,9 +207,17 @@ class S3AttachmentStorage(AttachmentStorage):
                 ),
             )
 
-    def open(self, *, storage_key: str) -> BinaryIO:
+    def open(self, *, storage_key: str, byte_range: tuple[int, int] | None = None) -> BinaryIO:
+        extra_args = {}
+        if byte_range is not None:
+            start, end = byte_range
+            extra_args["Range"] = f"bytes={start}-{end}"
         try:
-            response = self._client().get_object(Bucket=self.bucket_name, Key=storage_key)
+            response = self._client().get_object(
+                Bucket=self.bucket_name,
+                Key=storage_key,
+                **extra_args,
+            )
         except Exception as exc:
             if _is_not_found_error(exc):
                 raise AttachmentObjectNotFoundError(storage_key) from exc
@@ -315,15 +327,17 @@ def get_legacy_attachment_storage() -> LocalFilesystemAttachmentStorage | None:
     return LocalFilesystemAttachmentStorage()
 
 
-def open_attachment_for_download(*, storage_key: str) -> BinaryIO:
+def open_attachment_for_download(
+    *, storage_key: str, byte_range: tuple[int, int] | None = None
+) -> BinaryIO:
     storage = get_attachment_storage()
     try:
-        return storage.open(storage_key=storage_key)
+        return storage.open(storage_key=storage_key, byte_range=byte_range)
     except AttachmentObjectNotFoundError:
         legacy_storage = get_legacy_attachment_storage()
         if legacy_storage is None:
             raise
-        return legacy_storage.open(storage_key=storage_key)
+        return legacy_storage.open(storage_key=storage_key, byte_range=byte_range)
 
 
 def delete_attachment_from_storage(*, storage_key: str) -> None:

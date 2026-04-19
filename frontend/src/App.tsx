@@ -51,6 +51,7 @@ import {
   updateRoom,
   uploadAttachment,
 } from "./lib/api";
+import { MessageAttachmentCard } from "./components/MessageAttachmentCard";
 import type {
   ActiveChat,
   DialogSummary,
@@ -163,14 +164,6 @@ function compactCount(value: number): string {
     return String(value);
   }
   return "99+";
-}
-
-function isImageAttachment(contentType: string): boolean {
-  return contentType.toLowerCase().startsWith("image/");
-}
-
-function isVideoAttachment(contentType: string): boolean {
-  return contentType.toLowerCase().startsWith("video/");
 }
 
 function upsertMessage(list: Message[], message: Message): Message[] {
@@ -1811,38 +1804,13 @@ export default function App() {
                           <div className="attachment-list">
                             {message.attachments.map((attachment) => {
                               const attachmentUrl = toPublicUrl(attachment.download_url);
-                              const showImage = isImageAttachment(attachment.content_type);
-                              const showVideo = isVideoAttachment(attachment.content_type);
 
                               return (
-                                <div className="attachment-card" key={attachment.id}>
-                                  {showImage ? (
-                                    <a
-                                      className="attachment-media-link"
-                                      href={attachmentUrl}
-                                      rel="noreferrer"
-                                      target="_blank"
-                                    >
-                                      <img
-                                        alt={attachment.filename}
-                                        className="attachment-media attachment-image"
-                                        loading="lazy"
-                                        src={attachmentUrl}
-                                      />
-                                    </a>
-                                  ) : null}
-                                  {showVideo ? (
-                                    <video className="attachment-media attachment-video" controls preload="metadata">
-                                      <source src={attachmentUrl} type={attachment.content_type} />
-                                      <a href={attachmentUrl} rel="noreferrer" target="_blank">
-                                        {attachment.filename}
-                                      </a>
-                                    </video>
-                                  ) : null}
-                                  <a className="attachment-link" href={attachmentUrl} rel="noreferrer" target="_blank">
-                                    {attachment.filename}
-                                  </a>
-                                </div>
+                                <MessageAttachmentCard
+                                  attachment={attachment}
+                                  attachmentUrl={attachmentUrl}
+                                  key={attachment.id}
+                                />
                               );
                             })}
                           </div>

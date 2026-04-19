@@ -122,6 +122,9 @@ FRONTEND_PROXY_TARGET=http://backend:8000
 * When `ATTACHMENTS_STORAGE_BACKEND=s3`, the `ATTACHMENTS_S3_*` variables MUST point at the S3-compatible endpoint and target bucket.
 * `ATTACHMENTS_RUN_BACKFILL_ON_STARTUP=1` MAY be used to run the attachment backfill command automatically during backend startup when the S3 backend is active. It defaults to disabled.
 * Local Docker Compose deployment SHOULD default to `ATTACHMENTS_STORAGE_BACKEND=s3` so attachment flows and readiness checks validate the MinIO-backed topology.
+* Attachment downloads continue to flow through the backend even when blobs are stored in MinIO; the deployment MUST NOT replace this with unauthenticated public object URLs.
+* The backend attachment download path supports streaming and single-range passthrough for inline media, so reverse proxies MUST allow `Range` request headers and `206 Partial Content` responses to pass through unchanged.
+* Access revocation remains immediate because each attachment request is re-authorized at request time; deployments MUST NOT introduce long-lived attachment redirects or caches that bypass backend authorization.
 * Redis-backed realtime is required for Docker/local integration and all non-debug deployments.
 * In-memory Channels fallback is only acceptable for isolated tests or ad hoc local runs, and requires `DJANGO_ALLOW_INMEMORY_CHANNEL_LAYER=1` when `REDIS_URL` is not set.
 * Frontend API and WebSocket URLs SHOULD target the backend’s exposed local port.

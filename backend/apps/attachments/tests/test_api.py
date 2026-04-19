@@ -7,7 +7,7 @@ from django.utils import timezone
 from rest_framework.test import APIClient
 
 from apps.attachments.models import Attachment, RoomMessageAttachment
-from apps.attachments.services import attachment_absolute_path
+from apps.attachments.storage import attachment_absolute_path
 from apps.chat.models import Dialog, Room, RoomBan, RoomMembership, RoomMessage
 from apps.common.enums import AttachmentBindingType, RoomRole, RoomVisibility
 from apps.social.models import Friendship

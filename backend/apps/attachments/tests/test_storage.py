@@ -39,6 +39,7 @@ class FakeS3Client:
         self.objects: dict[tuple[str, str], dict] = {}
         self.buckets: set[str] = {"uploads"}
         self.head_bucket_error: Exception | None = None
+        self.get_object_calls: list[dict[str, str]] = []
 
     def upload_fileobj(self, fileobj, bucket: str, key: str, ExtraArgs: dict | None = None) -> None:
         self.objects[(bucket, key)] = {
@@ -54,12 +55,17 @@ class FakeS3Client:
             "metadata": kwargs.get("Metadata", {}),
         }
 
-    def get_object(self, Bucket: str, Key: str) -> dict:
+    def get_object(self, Bucket: str, Key: str, Range: str | None = None) -> dict:
         try:
             item = self.objects[(Bucket, Key)]
         except KeyError as exc:
             raise FakeS3Error("NoSuchKey") from exc
-        return {"Body": io.BytesIO(item["body"])}
+        body = item["body"]
+        if Range is not None:
+            start, end = _parse_fake_s3_range(Range=Range, total_size=len(body))
+            body = body[start : end + 1]
+        self.get_object_calls.append({"bucket": Bucket, "key": Key, "range": Range})
+        return {"Body": io.BytesIO(body)}
 
     def head_object(self, Bucket: str, Key: str) -> dict:
         try:
@@ -80,6 +86,27 @@ class FakeS3Client:
 
     def delete_object(self, Bucket: str, Key: str) -> None:
         self.objects.pop((Bucket, Key), None)
+
+
+def _parse_fake_s3_range(*, Range: str, total_size: int) -> tuple[int, int]:
+    if not Range.startswith("bytes="):
+        raise FakeS3Error("InvalidRange")
+
+    start_text, end_text = Range.removeprefix("bytes=").split("-", 1)
+    if not start_text:
+        suffix_length = int(end_text)
+        if suffix_length <= 0:
+            raise FakeS3Error("InvalidRange")
+        start = max(total_size - suffix_length, 0)
+        return (start, total_size - 1)
+
+    start = int(start_text)
+    if start >= total_size:
+        raise FakeS3Error("InvalidRange")
+    end = total_size - 1 if not end_text else int(end_text)
+    if end < start:
+        raise FakeS3Error("InvalidRange")
+    return (start, min(end, total_size - 1))
 
 
 @pytest.fixture
@@ -342,6 +369,9 @@ def test_attachment_upload_and_download_preserve_contract_with_s3_backend(
     assert metadata_response.status_code == 200
     assert metadata_response.json()["data"]["attachment"]["filename"] == "photo.png"
     assert download_response.status_code == 200
+    assert download_response.streaming is True
+    assert download_response["Content-Disposition"].startswith("inline;")
+    assert download_response["Accept-Ranges"] == "bytes"
     assert b"".join(download_response.streaming_content) == b"s3-image"
 
 
@@ -393,6 +423,103 @@ def test_attachment_download_endpoint_serves_legacy_filesystem_blob_during_s3_cu
     assert response.status_code == 200
     assert b"".join(response.streaming_content) == b"legacy-bytes"
     assert ("uploads", attachment.storage_key) not in fake_s3_client.objects
+
+
+@pytest.mark.django_db
+@override_settings(
+    ATTACHMENTS_STORAGE_BACKEND="s3",
+    ATTACHMENTS_S3_ENDPOINT_URL="http://minio:9000",
+    ATTACHMENTS_S3_BUCKET="uploads",
+    ATTACHMENTS_S3_ACCESS_KEY_ID="minioadmin",
+    ATTACHMENTS_S3_SECRET_ACCESS_KEY="minioadmin",
+    ATTACHMENTS_S3_USE_SSL=False,
+    ATTACHMENTS_S3_VERIFY_SSL=False,
+)
+def test_attachment_download_supports_single_range_requests_for_s3_media(
+    fake_s3_client: FakeS3Client,
+) -> None:
+    owner = create_user(email="s3-range-owner@example.com", username="s3rangeowner")
+    room = create_room(owner=owner, name="s3-range-room", visibility=RoomVisibility.PUBLIC)
+    message = RoomMessage.objects.create(room=room, sender_user=owner, text="with ranged file")
+    attachment = Attachment.objects.create(
+        uploaded_by_user=owner,
+        storage_key="range/video.mp4",
+        original_filename="video.mp4",
+        content_type="video/mp4",
+        size_bytes=10,
+        binding_type=AttachmentBindingType.ROOM_MESSAGE,
+    )
+    RoomMessageAttachment.objects.create(room_message=message, attachment=attachment)
+    fake_s3_client.put_object(
+        Bucket="uploads",
+        Key=attachment.storage_key,
+        Body=b"0123456789",
+        ContentType=attachment.content_type,
+        Metadata={"original_filename": attachment.original_filename},
+    )
+
+    owner_client = APIClient()
+    owner_client.force_login(owner)
+
+    response = owner_client.get(
+        reverse("attachment-download", kwargs={"attachment_id": attachment.id}),
+        HTTP_RANGE="bytes=2-5",
+    )
+
+    assert response.status_code == 206
+    assert response.streaming is True
+    assert response["Accept-Ranges"] == "bytes"
+    assert response["Content-Range"] == "bytes 2-5/10"
+    assert response["Content-Length"] == "4"
+    assert response["Content-Disposition"].startswith("inline;")
+    assert b"".join(response.streaming_content) == b"2345"
+    assert fake_s3_client.get_object_calls[-1]["range"] == "bytes=2-5"
+
+
+@pytest.mark.django_db
+@override_settings(
+    ATTACHMENTS_STORAGE_BACKEND="s3",
+    ATTACHMENTS_S3_ENDPOINT_URL="http://minio:9000",
+    ATTACHMENTS_S3_BUCKET="uploads",
+    ATTACHMENTS_S3_ACCESS_KEY_ID="minioadmin",
+    ATTACHMENTS_S3_SECRET_ACCESS_KEY="minioadmin",
+    ATTACHMENTS_S3_USE_SSL=False,
+    ATTACHMENTS_S3_VERIFY_SSL=False,
+)
+def test_attachment_download_rejects_unsatisfiable_range_requests(
+    fake_s3_client: FakeS3Client,
+) -> None:
+    owner = create_user(email="s3-unsat-owner@example.com", username="s3unsatowner")
+    room = create_room(owner=owner, name="s3-unsat-room", visibility=RoomVisibility.PUBLIC)
+    message = RoomMessage.objects.create(room=room, sender_user=owner, text="with file")
+    attachment = Attachment.objects.create(
+        uploaded_by_user=owner,
+        storage_key="range/audio.mp3",
+        original_filename="audio.mp3",
+        content_type="audio/mpeg",
+        size_bytes=5,
+        binding_type=AttachmentBindingType.ROOM_MESSAGE,
+    )
+    RoomMessageAttachment.objects.create(room_message=message, attachment=attachment)
+    fake_s3_client.put_object(
+        Bucket="uploads",
+        Key=attachment.storage_key,
+        Body=b"12345",
+        ContentType=attachment.content_type,
+        Metadata={"original_filename": attachment.original_filename},
+    )
+
+    owner_client = APIClient()
+    owner_client.force_login(owner)
+
+    response = owner_client.get(
+        reverse("attachment-download", kwargs={"attachment_id": attachment.id}),
+        HTTP_RANGE="bytes=10-20",
+    )
+
+    assert response.status_code == 416
+    assert response["Accept-Ranges"] == "bytes"
+    assert response["Content-Range"] == "bytes */5"
 
 
 @pytest.mark.django_db

@@ -630,7 +630,11 @@ def build_openapi_schema(request) -> dict:
                 "get": _operation(
                     summary="Download attachment",
                     tags=["Attachments"],
-                    description="Streams the attachment when the authenticated user is authorized.",
+                    description=(
+                        "Streams the attachment when the authenticated user is authorized. "
+                        "Inline media may be served with browser-friendly disposition headers "
+                        "and single-range partial responses."
+                    ),
                     response_description="Attachment download stream.",
                     parameters=[
                         _path_parameter(

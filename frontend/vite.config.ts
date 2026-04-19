@@ -9,6 +9,11 @@ export default defineConfig(({ mode }) => {
 
   return {
     plugins: [react()],
+    test: {
+      environment: "node",
+      globals: false,
+      include: ["tests/**/*.test.ts", "tests/**/*.test.tsx"],
+    },
     server: {
       host: "0.0.0.0",
       port: Number(env.FRONTEND_PORT || 3000),

@@ -781,6 +781,42 @@ Provide a deterministic migration path for attachments that already exist on loc
 
 ---
 
+### T6.8 Implement streaming-safe attachment delivery for inline media
+**Status:** TODO
+
+#### Objective
+Prevent large attachment downloads from exhausting backend memory or crashing browser media rendering by serving object-storage-backed media as a streamed response path.
+
+#### Requirements
+- MUST preserve the existing attachment authorization boundary at the backend
+- MUST preserve the existing public API endpoints unless a higher-precedence contract update is required
+- MUST NOT read the full attachment into backend memory before sending the response
+- MUST support streamed reads from MinIO/object storage for large attachments
+- MUST evaluate support for browser range requests for media playback and seeking when the object is stored in MinIO
+- MUST define whether delivery uses direct backend streaming, backend proxying with passthrough headers, or short-lived backend-authorized redirects, and document the tradeoff
+- MUST preserve immediate access revocation when room or dialog access is lost
+- MUST preserve original filename and content type handling
+- SHOULD set response headers that help browsers avoid unnecessary eager downloads for inline media previews
+
+#### Deliverables
+- delivery design decision for large attachment downloads
+- backend attachment download implementation updated to use a true streaming path for object storage
+- header and range-request behavior documented for attachment downloads
+- operational notes covering revocation, expiry, and fallback behavior
+
+#### Acceptance Criteria
+- large attachments can be rendered or downloaded without buffering the full object in backend memory
+- browser media elements can request only the bytes they need for preview/playback where supported
+- unauthorized users still receive the same contract-compliant rejection behavior
+
+#### Tests
+- download response test proving streaming iteration for MinIO-backed files
+- range-request test for authorized media download if range support is implemented
+- authorization regression tests for revoked room/dialog access
+- large-object integration smoke test that avoids loading the full payload into process memory
+
+---
+
 ## M7. Presence and Unread State
 
 ### T7.1 Implement presence domain logic
@@ -1168,6 +1204,32 @@ Provide a deterministic migration path for attachments that already exist on loc
 - show active sessions
 - revoke selected session
 - support current-session semantics correctly
+
+---
+
+### T10.7 Harden inline attachment rendering for large media
+**Status:** IN PROGRESS
+
+#### Objective
+Keep the chat UI usable when messages contain large images or videos by avoiding browser behavior that eagerly loads full media objects.
+
+#### Requirements
+- MUST keep attachment access on the existing authorized download path
+- MUST define separate rendering behavior for images, videos, and non-previewable files
+- MUST avoid automatically forcing full-media fetches when only a preview/poster/metadata view is needed
+- MUST provide a safe fallback interaction for very large media, such as click-to-open or explicit load
+- MUST remain compatible with the backend streaming strategy chosen in `T6.8`
+- MUST preserve the existing attachment link/download behavior for files that are not previewed inline
+
+#### Acceptance Criteria
+- message history remains usable when large media attachments are present
+- inline previews do not trigger avoidable full-media downloads during normal scrolling
+- users still have an explicit path to open or download the original attachment
+
+#### Tests
+- vitest frontend rendering test for image attachments
+- vitest frontend rendering test for video attachments with non-eager loading behavior
+- manual browser validation notes for large-media preview and playback
 
 ---
 

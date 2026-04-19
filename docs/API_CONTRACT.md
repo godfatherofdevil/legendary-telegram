@@ -2176,10 +2176,19 @@ GET /api/v1/attachments/{attachment_id}/download
 
 * MUST stream/download file
 * MUST enforce authorization at request time
+* MUST keep the backend as the authorization boundary; presigned public object URLs MUST NOT be exposed
+* MUST stream object-storage-backed files without buffering the full object in backend memory
+* SHOULD return `Content-Disposition: inline` for image, audio, and video attachments so browser previews do not force eager download behavior
+* SHOULD return `Content-Disposition: attachment` for non-inline attachment types
+* SHOULD support single `Range: bytes=...` requests for browser media playback and seeking
+* when a valid single range is requested, MUST return `206 Partial Content` with `Accept-Ranges: bytes` and `Content-Range`
+* when a requested range is unsatisfiable, SHOULD return `416 Requested Range Not Satisfiable` with `Content-Range: bytes */{full_size}`
+* legacy filesystem-backed blobs MAY continue to be streamed through the same endpoint during storage cutover, but authorization and revocation rules remain identical
 
 ### Responses
 
 * `200 OK` with file stream
+* `206 Partial Content` with ranged file stream when applicable
 * `403 Forbidden` or `404 Not Found` if not allowed
 
 ---
