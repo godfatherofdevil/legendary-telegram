@@ -101,6 +101,8 @@ FRONTEND_PROXY_TARGET=http://backend:8000
 * `DJANGO_SECURE_SSL_REDIRECT`, `DJANGO_USE_X_FORWARDED_HOST`, and `DJANGO_SECURE_HSTS_SECONDS` SHOULD be configured explicitly when running behind TLS termination or a reverse proxy.
 * `DATABASE_URL` MUST point to the `postgres` service hostname.
 * `REDIS_URL` MUST point to the `redis` service hostname.
+* Redis-backed realtime is required for Docker/local integration and all non-debug deployments.
+* In-memory Channels fallback is only acceptable for isolated tests or ad hoc local runs, and requires `DJANGO_ALLOW_INMEMORY_CHANNEL_LAYER=1` when `REDIS_URL` is not set.
 * Frontend API and WebSocket URLs SHOULD target the backend’s exposed local port.
 
 ---

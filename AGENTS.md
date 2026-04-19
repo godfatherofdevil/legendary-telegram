@@ -19,12 +19,12 @@ If any instruction in this file conflicts with another repository document, agen
 Agents MUST use the following precedence order, highest first:
 
 1. `AGENTS.md`
-2. `API_CONTRACT.md`
-3. `SCHEMA.md`
-4. `ARCHITECTURE.md`
-5. `DEPLOYEMENT.md`
-6. `TASKS.md`
-7. `DJANGO_MODELS_MAPPING.md`
+2. `docs/API_CONTRACT.md`
+3. `docs/SCHEMA.md`
+4. `docs/ARCHITECTURE.md`
+5. `docs/DEPLOYEMENT.md`
+6. `docs/TASKS.md`
+7. `docs/DJANGO_MODELS_MAPPING.md`
 7. source code and tests
 8. any generated notes or temporary plans
 
@@ -60,28 +60,28 @@ Rules:
 
 Agents MUST treat the following repository files as required sources of truth:
 
-- `API_CONTRACT.md`
-- `SCHEMA.md`
-- `ARCHITECTURE.md`
-- `DEPLOYEMENT.md`
+- `docs/API_CONTRACT.md`
+- `docs/SCHEMA.md`
+- `docs/ARCHITECTURE.md`
+- `docs/DEPLOYEMENT.md`
 
 ### 4.1 SCHEMA Rules
 
-- Agents MUST use `SCHEMA.md` as the database source of truth.
-- Agents MUST NOT invent database schema independently when `SCHEMA.md` defines it.
-- Agents MUST generate database migrations from `SCHEMA.md` requirements via Django migrations
-- Agents MUST NOT introduce schema objects that contradict `SCHEMA.md`.
-- If `SCHEMA.md` is incomplete, agents MAY add only the minimum schema needed to satisfy the existing contract, and MUST document that addition clearly.
+- Agents MUST use `docs/SCHEMA.md` as the database source of truth.
+- Agents MUST NOT invent database schema independently when `docs/SCHEMA.md` defines it.
+- Agents MUST generate database migrations from `docs/SCHEMA.md` requirements via Django migrations
+- Agents MUST NOT introduce schema objects that contradict `docs/SCHEMA.md`.
+- If `docs/SCHEMA.md` is incomplete, agents MAY add only the minimum schema needed to satisfy the existing contract, and MUST document that addition clearly.
 
 ### 4.2 ARCHITECTURE Rules
 
-- Agents MUST follow `ARCHITECTURE.md` for system boundaries and component responsibilities.
+- Agents MUST follow `docs/ARCHITECTURE.md` for system boundaries and component responsibilities.
 - Agents MUST NOT collapse architecture layers unless explicitly allowed there.
 - Agents MUST align real-time, REST, database, and storage flows with the defined architecture.
 
 ### 4.3 DEPLOYMENT Rules
 
-- Agents MUST ensure the project runs according to `DEPLOYEMENT.md`.
+- Agents MUST ensure the project runs according to `docs/DEPLOYEMENT.md`.
 - Agents MUST keep the deployment path compatible with Docker Compose.
 - Agents MUST update deployment instructions when implementation changes deployment requirements.
 
@@ -170,9 +170,9 @@ Rules:
 Agents MUST:
 
 - read `AGENTS.md`
-- read `API_CONTRACT.md`
-- read relevant sections of `SCHEMA.md`
-- read relevant sections of `ARCHITECTURE.md`
+- read `docs/API_CONTRACT.md`
+- read relevant sections of `docs/SCHEMA.md`
+- read relevant sections of `docs/ARCHITECTURE.md`
 - identify affected modules before editing
 - verify whether an existing abstraction already supports the needed change
 
@@ -203,7 +203,7 @@ Agents MUST:
 - add or update tests for changed behavior
 - verify linters or static checks where configured
 - verify migrations are coherent
-- verify new endpoints match `API_CONTRACT.md`
+- verify new endpoints match `docs/API_CONTRACT.md`
 - verify permission and access-control rules
 - verify imports and module boundaries remain clean
 - if any database migrations were added then verify it by running following command
@@ -215,7 +215,7 @@ docker compose up -d postgres && sleep 10 && cd backend && python manage.py migr
 
 ## 9. API Compliance Rules
 
-- Agents MUST implement the REST and WebSocket interfaces exactly as defined in `API_CONTRACT.md`.
+- Agents MUST implement the REST and WebSocket interfaces exactly as defined in `docs/API_CONTRACT.md`.
 - Agents MUST NOT rename endpoints without updating the contract.
 - Agents MUST NOT rename payload fields without updating the contract.
 - Agents MUST NOT change enum values without updating the contract.
@@ -413,7 +413,7 @@ Review agents MUST NOT approve code that:
 
 - violates the API contract
 - skips server-side authorization
-- introduces schema drift against `SCHEMA.md`
+- introduces schema drift against `docs/SCHEMA.md`
 - breaks `docker compose up`
 - leaves required flows untested
 
@@ -638,4 +638,3 @@ When in doubt, agents MUST implement the smallest secure, testable, spec-complia
 No agent is permitted to trade away those properties for convenience.
 
 ---
-

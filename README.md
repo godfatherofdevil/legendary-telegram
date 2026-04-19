@@ -28,16 +28,19 @@ This monorepo keeps backend and frontend in one repository while preserving clea
 ```text
 chat-app/
 ├── AGENTS.md
-├── API_CONTRACT.md
-├── SCHEMA.md
-├── DJANGO_MODELS_MAPPING.md
-├── ARCHITECTURE.md
-├── DEPLOYMENT.md
-├── DEPLOYEMENT.md
-├── TASKS.md
 ├── README.md
 ├── .env.example
 ├── docker-compose.yml
+├── docs/
+│   ├── API_CONTRACT.md
+│   ├── SCHEMA.md
+│   ├── DJANGO_MODELS_MAPPING.md
+│   ├── ARCHITECTURE.md
+│   ├── DEPLOYMENT.md
+│   ├── DEPLOYEMENT.md
+│   ├── MIGRATION_PLAN.md
+│   ├── MIGRATION_TASKS.md
+│   └── TASKS.md
 │
 ├── backend/
 │   ├── Dockerfile
@@ -69,13 +72,15 @@ chat-app/
 
 The following files define project behavior and implementation expectations:
 
-* `AGENTS.md` — agent behavior and implementation rules
-* `API_CONTRACT.md` — REST and WebSocket contract
-* `SCHEMA.md` — initial logical database schema
-* `DJANGO_MODELS_MAPPING.md` — Django model mapping guidance
-* `ARCHITECTURE.md` — architecture rules and system boundaries
-* `DEPLOYMENT.md` — local Docker-based deployment instructions
-* `TASKS.md` — implementation sequencing plan
+* [AGENTS.md](AGENTS.md) — agent behavior and implementation rules
+* [docs/API_CONTRACT.md](docs/API_CONTRACT.md) — REST and WebSocket contract
+* [docs/SCHEMA.md](docs/SCHEMA.md) — initial logical database schema
+* [docs/DJANGO_MODELS_MAPPING.md](docs/DJANGO_MODELS_MAPPING.md) — Django model mapping guidance
+* [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) — architecture rules and system boundaries
+* [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md) — local Docker-based deployment instructions
+* [docs/TASKS.md](docs/TASKS.md) — implementation sequencing plan
+
+Additional planning and migration notes are also kept under [`docs/`](docs/).
 
 If any implementation detail is unclear, these documents must be consulted in precedence order defined by `AGENTS.md`.
 
@@ -335,9 +340,9 @@ docker compose up frontend
 Read the authoritative docs:
 
 * `AGENTS.md`
-* `API_CONTRACT.md`
-* `SCHEMA.md`
-* `TASKS.md`
+* `docs/API_CONTRACT.md`
+* `docs/SCHEMA.md`
+* `docs/TASKS.md`
 
 ### Step 2
 
@@ -484,7 +489,7 @@ See `AGENTS.md` for the full rule set.
 
 ## 16. Suggested Implementation Order
 
-Use `TASKS.md` as the main execution plan.
+Use `docs/TASKS.md` as the main execution plan.
 
 High-level order:
 
@@ -631,8 +636,8 @@ Those may be added later.
 When contributing:
 
 * read the specs first
-* follow `TASKS.md`
-* do not break `API_CONTRACT.md`
+* follow `docs/TASKS.md`
+* do not break `docs/API_CONTRACT.md`
 * keep changes scoped
 * add tests
 * update docs when needed

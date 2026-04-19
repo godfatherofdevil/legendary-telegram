@@ -95,6 +95,11 @@ def validate_runtime_configuration() -> None:
             "DJANGO_ALLOWED_HOSTS must include at least one host when DJANGO_DEBUG=0."
         )
 
+    if not settings.REDIS_URL:
+        raise ImproperlyConfigured(
+            "REDIS_URL must be configured when DJANGO_DEBUG=0 so realtime uses Redis-backed fanout."
+        )
+
 
 def prepare_runtime_directories() -> None:
     for directory in (Path(settings.MEDIA_ROOT), Path(settings.STATIC_ROOT)):

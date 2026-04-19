@@ -3,7 +3,7 @@ from django.contrib.auth import get_user_model
 from django.urls import reverse
 from rest_framework.test import APIClient
 
-from apps.chat.models import Dialog
+from apps.chat.models import Dialog, DialogMessage
 from apps.social.models import FriendRequest, Friendship, PeerBan
 
 User = get_user_model()
@@ -144,7 +144,11 @@ def test_remove_friend_and_peer_ban_update_dialog_state(api_client: APIClient) -
         format="json",
     )
     assert create_ban_response.status_code == 201
-    assert PeerBan.objects.filter(source_user=alice, target_user=bob, removed_at__isnull=True).exists()
+    assert PeerBan.objects.filter(
+        source_user=alice,
+        target_user=bob,
+        removed_at__isnull=True,
+    ).exists()
     dialog.refresh_from_db()
     assert dialog.is_frozen is True
     assert Friendship.objects.exists() is False
@@ -153,7 +157,9 @@ def test_remove_friend_and_peer_ban_update_dialog_state(api_client: APIClient) -
     assert list_response.status_code == 200
     assert list_response.json()["data"][0]["user"]["username"] == "bob-ban"
 
-    remove_ban_response = alice_client.delete(reverse("peer-ban-detail", kwargs={"user_id": bob.id}))
+    remove_ban_response = alice_client.delete(
+        reverse("peer-ban-detail", kwargs={"user_id": bob.id})
+    )
     assert remove_ban_response.status_code == 204
     dialog.refresh_from_db()
     assert dialog.is_frozen is True
@@ -190,3 +196,52 @@ def test_remove_friend_updates_other_user_reload_state(api_client: APIClient) ->
             "is_frozen": True,
         }
     ]
+
+
+@pytest.mark.django_db
+def test_peer_ban_freezes_existing_dialog_sends_for_both_users(api_client: APIClient) -> None:
+    alice = create_user(email="alice-freeze@example.com", username="alice-freeze")
+    bob = create_user(email="bob-freeze@example.com", username="bob-freeze")
+    make_friends(alice, bob)
+    user_low, user_high = sorted([alice, bob], key=lambda user: str(user.id))
+    dialog = Dialog.objects.create(user_low=user_low, user_high=user_high)
+    existing_message = DialogMessage.objects.create(
+        dialog=dialog,
+        sender_user=alice,
+        text="history",
+    )
+
+    alice_client = APIClient()
+    alice_client.force_login(alice)
+    bob_client = APIClient()
+    bob_client.force_login(bob)
+
+    ban_response = alice_client.post(
+        reverse("peer-ban-list-create"),
+        {"user_id": str(bob.id)},
+        format="json",
+    )
+    alice_send_response = alice_client.post(
+        reverse("dialog-message-list-create", kwargs={"dialog_id": dialog.id}),
+        {"text": "owner blocked too"},
+        format="json",
+    )
+    bob_send_response = bob_client.post(
+        reverse("dialog-message-list-create", kwargs={"dialog_id": dialog.id}),
+        {"text": "blocked"},
+        format="json",
+    )
+    alice_history_response = alice_client.get(
+        reverse("dialog-message-list-create", kwargs={"dialog_id": dialog.id})
+    )
+    bob_history_response = bob_client.get(
+        reverse("dialog-message-list-create", kwargs={"dialog_id": dialog.id})
+    )
+
+    assert ban_response.status_code == 201
+    assert alice_send_response.status_code == 403
+    assert bob_send_response.status_code == 403
+    assert alice_history_response.status_code == 200
+    assert bob_history_response.status_code == 200
+    assert alice_history_response.json()["data"][0]["id"] == str(existing_message.id)
+    assert bob_history_response.json()["data"][0]["id"] == str(existing_message.id)

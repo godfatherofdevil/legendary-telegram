@@ -1,5 +1,7 @@
 import pytest
 from django.contrib.auth import get_user_model
+from django.db import connection
+from django.test.utils import CaptureQueriesContext
 from django.urls import reverse
 from django.utils import timezone
 from rest_framework.test import APIClient
@@ -15,6 +17,7 @@ from apps.chat.models import (
     RoomMessage,
     RoomReadState,
 )
+from apps.chat.services import PageWindow, list_dialog_rows, list_room_message_rows
 from apps.common.enums import AttachmentBindingType, RoomRole, RoomVisibility
 from apps.social.models import Friendship, PeerBan
 
@@ -723,7 +726,9 @@ def test_private_room_invitation_flow_requires_admin_and_creates_membership(
     assert create_response.status_code == 201
     invitation_id = create_response.json()["data"]["invitation"]["id"]
 
-    list_response = admin_client.get(reverse("room-invitation-list-create", kwargs={"room_id": room.id}))
+    list_response = admin_client.get(
+        reverse("room-invitation-list-create", kwargs={"room_id": room.id})
+    )
     assert list_response.status_code == 200
     assert list_response.json()["data"][0]["user"]["username"] == invited.username
 
@@ -769,7 +774,9 @@ def test_room_admin_promotion_and_demotion_follow_role_rules(api_client: APIClie
     assert owner_promote_response.status_code == 204
     RoomMembership.objects.get(room=room, user=member, role=RoomRole.ADMIN)
 
-    owner_client.delete(reverse("room-admin-detail", kwargs={"room_id": room.id, "user_id": member.id}))
+    owner_client.delete(
+        reverse("room-admin-detail", kwargs={"room_id": room.id, "user_id": member.id})
+    )
     RoomMembership.objects.get(room=room, user=member, role=RoomRole.MEMBER)
 
     self_demote_response = admin_client.delete(
@@ -806,10 +813,14 @@ def test_room_remove_member_and_room_ban_flow_enforces_access_rules(api_client: 
     assert RoomMembership.objects.filter(room=room, user=member).exists() is False
     assert RoomBan.objects.filter(room=room, user=member, removed_at__isnull=True).exists() is True
 
-    banned_history = member_client.get(reverse("room-message-list-create", kwargs={"room_id": room.id}))
+    banned_history = member_client.get(
+        reverse("room-message-list-create", kwargs={"room_id": room.id})
+    )
     assert banned_history.status_code == 404
 
-    ban_list_response = admin_client.get(reverse("room-ban-list-create", kwargs={"room_id": room.id}))
+    ban_list_response = admin_client.get(
+        reverse("room-ban-list-create", kwargs={"room_id": room.id})
+    )
     assert ban_list_response.status_code == 200
     assert ban_list_response.json()["data"][0]["user"]["username"] == member.username
 
@@ -818,3 +829,48 @@ def test_room_remove_member_and_room_ban_flow_enforces_access_rules(api_client: 
     )
     assert unban_response.status_code == 204
     assert RoomBan.objects.filter(room=room, user=member, removed_at__isnull=True).exists() is False
+
+
+@pytest.mark.django_db
+def test_room_message_history_read_uses_bounded_query_count() -> None:
+    owner = create_user(email="query-owner@example.com", username="query-owner")
+    room = create_room(owner=owner, name="query-room-history", visibility=RoomVisibility.PUBLIC)
+    for index in range(25):
+        RoomMessage.objects.create(room=room, sender_user=owner, text=f"message {index}")
+
+    with CaptureQueriesContext(connection) as captured:
+        messages, has_next = list_room_message_rows(
+            room=room,
+            user=owner,
+            page=PageWindow(offset=0, limit=10),
+        )
+
+    assert has_next is True
+    assert len(messages) == 10
+    assert messages[0].text == "message 15"
+    assert messages[-1].text == "message 24"
+    assert len(captured) <= 4
+
+
+@pytest.mark.django_db
+def test_dialog_list_read_uses_constant_query_count_for_multiple_dialogs() -> None:
+    viewer = create_user(email="viewer@example.com", username="viewer")
+    for index in range(5):
+        other_user = create_user(
+            email=f"dialog-{index}@example.com",
+            username=f"dialog-user-{index}",
+        )
+        make_friends(viewer, other_user)
+        user_low, user_high = sorted([viewer, other_user], key=lambda user: str(user.id))
+        dialog = Dialog.objects.create(user_low=user_low, user_high=user_high)
+        DialogMessage.objects.create(dialog=dialog, sender_user=other_user, text=f"first {index}")
+        DialogMessage.objects.create(dialog=dialog, sender_user=viewer, text=f"second {index}")
+
+    with CaptureQueriesContext(connection) as captured:
+        dialogs, unread_counts, last_messages = list_dialog_rows(user=viewer)
+
+    assert len(dialogs) == 5
+    assert all(unread_counts[dialog.id] == 1 for dialog in dialogs)
+    assert len(last_messages) == 5
+    assert all(message.text.startswith("second") for message in last_messages.values())
+    assert len(captured) <= 4

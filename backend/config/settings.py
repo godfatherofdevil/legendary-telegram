@@ -2,6 +2,7 @@ import os
 from pathlib import Path
 
 import dj_database_url
+from django.core.exceptions import ImproperlyConfigured
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 LOCAL_DEV_SECRET_KEY = "local-dev-secret-key"
@@ -10,6 +11,21 @@ LOCAL_DEV_SECRET_KEY = "local-dev-secret-key"
 def env_bool(name: str, default: bool = False) -> bool:
     value = str(os.environ.get(name, str(int(default)))).strip().lower()
     return value in {"1", "true", "yes", "on"}
+
+
+def build_channel_layers(*, redis_url: str, allow_inmemory_fallback: bool) -> dict:
+    if redis_url:
+        return {
+            "default": {
+                "BACKEND": "channels_redis.core.RedisChannelLayer",
+                "CONFIG": {"hosts": [redis_url]},
+            }
+        }
+    if allow_inmemory_fallback:
+        return {"default": {"BACKEND": "channels.layers.InMemoryChannelLayer"}}
+    raise ImproperlyConfigured(
+        "REDIS_URL must be configured when in-memory channel layer fallback is disabled."
+    )
 
 SECRET_KEY = os.environ.get("DJANGO_SECRET_KEY", LOCAL_DEV_SECRET_KEY)
 DEBUG = env_bool("DJANGO_DEBUG", True)
@@ -97,15 +113,23 @@ if DATABASES["default"]["ENGINE"] == "django.db.backends.sqlite3":
     DATABASES["default"]["OPTIONS"] = {"timeout": 20}
 
 REDIS_URL = os.environ.get("REDIS_URL", "")
-if REDIS_URL:
-    CHANNEL_LAYERS = {
-        "default": {
-            "BACKEND": "channels_redis.core.RedisChannelLayer",
-            "CONFIG": {"hosts": [REDIS_URL]},
-        }
-    }
-else:
-    CHANNEL_LAYERS = {"default": {"BACKEND": "channels.layers.InMemoryChannelLayer"}}
+ALLOW_INMEMORY_CHANNEL_LAYER = DEBUG or env_bool("DJANGO_ALLOW_INMEMORY_CHANNEL_LAYER", False)
+CHANNEL_LAYERS = build_channel_layers(
+    redis_url=REDIS_URL,
+    allow_inmemory_fallback=ALLOW_INMEMORY_CHANNEL_LAYER,
+)
+CHAT_MIGRATION_FLAGS = {
+    "redis_presence_enabled": env_bool("CHAT_REDIS_PRESENCE_ENABLED", False),
+    "redis_fanout_enabled": env_bool("CHAT_REDIS_FANOUT_ENABLED", False),
+    "redis_stream_publish_enabled": env_bool("CHAT_REDIS_STREAM_PUBLISH_ENABLED", False),
+    "async_persistence_enabled": env_bool("CHAT_ASYNC_PERSISTENCE_ENABLED", False),
+    "legacy_sql_presence_enabled": env_bool("CHAT_LEGACY_SQL_PRESENCE_ENABLED", False),
+    "legacy_sql_fanout_enabled": env_bool("CHAT_LEGACY_SQL_FANOUT_ENABLED", False),
+    "stream_fallback_to_sync_sql_enabled": env_bool(
+        "CHAT_STREAM_FALLBACK_TO_SYNC_SQL_ENABLED", False
+    ),
+    "parity_verification_enabled": env_bool("CHAT_PARITY_VERIFICATION_ENABLED", False),
+}
 
 REST_FRAMEWORK = {
     "DEFAULT_AUTHENTICATION_CLASSES": [

@@ -251,6 +251,56 @@ def test_attachment_delete_allows_unbound_owner_only_and_rejects_bound(
 
 
 @pytest.mark.django_db
+@override_settings(MEDIA_ROOT="/tmp/chat-app-test-media-room-delete")
+def test_room_deletion_revokes_attachment_access_and_removes_file(api_client: APIClient) -> None:
+    owner = create_user(email="delete-room-owner@example.com", username="delete-room-owner")
+    member = create_user(email="delete-room-member@example.com", username="delete-room-member")
+    room = create_room(owner=owner, name="deleted-files-room", visibility=RoomVisibility.PUBLIC)
+    RoomMembership.objects.create(
+        room=room,
+        user=member,
+        role=RoomRole.MEMBER,
+        joined_at=timezone.now(),
+    )
+    message = RoomMessage.objects.create(room=room, sender_user=owner, text="with file")
+    attachment = Attachment.objects.create(
+        uploaded_by_user=owner,
+        storage_key="ij/deleted-room.txt",
+        original_filename="deleted-room.txt",
+        content_type="text/plain",
+        size_bytes=12,
+        binding_type=AttachmentBindingType.ROOM_MESSAGE,
+    )
+    path = attachment_absolute_path(attachment.storage_key)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_bytes(b"room content")
+    RoomMessageAttachment.objects.create(room_message=message, attachment=attachment)
+
+    owner_client = APIClient()
+    owner_client.force_login(owner)
+    member_client = APIClient()
+    member_client.force_login(member)
+
+    assert member_client.get(
+        reverse("attachment-detail", kwargs={"attachment_id": attachment.id})
+    ).status_code == 200
+
+    delete_response = owner_client.delete(reverse("room-detail", kwargs={"room_id": room.id}))
+    detail_response = member_client.get(
+        reverse("attachment-detail", kwargs={"attachment_id": attachment.id})
+    )
+    download_response = member_client.get(
+        reverse("attachment-download", kwargs={"attachment_id": attachment.id})
+    )
+
+    assert delete_response.status_code == 204
+    assert detail_response.status_code == 404
+    assert download_response.status_code == 404
+    assert Attachment.objects.filter(id=attachment.id).exists() is False
+    assert path.exists() is False
+
+
+@pytest.mark.django_db
 @override_settings(MEDIA_ROOT="/tmp/chat-app-test-media-dialog")
 def test_dialog_attachment_access_is_limited_to_participants(api_client: APIClient) -> None:
     alice = create_user(email="alice@example.com", username="alice")

@@ -664,7 +664,7 @@ def build_openapi_schema(request) -> dict:
         },
         "externalDocs": {
             "description": "Repository API contract",
-            "url": "API_CONTRACT.md",
+            "url": "docs/API_CONTRACT.md",
         },
         "x-docs": {
             "schema_url": schema_url,

@@ -113,6 +113,17 @@ def test_validate_runtime_configuration_requires_allowed_hosts_in_non_debug(monk
     monkeypatch.setattr(startup.settings, "DEBUG", False)
     monkeypatch.setattr(startup.settings, "SECRET_KEY", "production-secret")
     monkeypatch.setattr(startup.settings, "ALLOWED_HOSTS", [])
+    monkeypatch.setattr(startup.settings, "REDIS_URL", "redis://redis:6379/0")
+
+    with pytest.raises(ImproperlyConfigured):
+        startup.validate_runtime_configuration()
+
+
+def test_validate_runtime_configuration_requires_redis_in_non_debug(monkeypatch) -> None:
+    monkeypatch.setattr(startup.settings, "DEBUG", False)
+    monkeypatch.setattr(startup.settings, "SECRET_KEY", "production-secret")
+    monkeypatch.setattr(startup.settings, "ALLOWED_HOSTS", ["example.com"])
+    monkeypatch.setattr(startup.settings, "REDIS_URL", "")
 
     with pytest.raises(ImproperlyConfigured):
         startup.validate_runtime_configuration()

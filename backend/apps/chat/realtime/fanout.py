@@ -4,61 +4,45 @@ from asgiref.sync import async_to_sync
 from channels.layers import get_channel_layer
 
 from apps.chat.models import DialogMessage, RoomMessage
+from apps.chat.realtime.groups import PRESENCE_GROUP, dialog_group, room_group, user_group
+from apps.chat.realtime.serializers import build_broadcast_event, build_control_event
 from apps.chat.serializers import (
     _isoformat,
-    serialize_dialog_summary_for_user,
     serialize_dialog_message,
+    serialize_dialog_summary_for_user,
     serialize_room_message,
 )
 from apps.chat.services import get_dialog_unread_count
-from apps.social.serializers import serialize_friend_request_update, serialize_incoming_friend_request
-
-PRESENCE_GROUP = "presence.all"
-
-
-def user_group(user_id) -> str:
-    return f"user.{user_id}"
+from apps.social.serializers import (
+    serialize_friend_request_update,
+    serialize_incoming_friend_request,
+)
 
 
-def room_group(room_id) -> str:
-    return f"room.{room_id}"
-
-
-def dialog_group(dialog_id) -> str:
-    return f"dialog.{dialog_id}"
+def _dispatch_group_message(group_name: str, message: dict) -> None:
+    channel_layer = get_channel_layer()
+    if channel_layer is None:
+        return
+    try:
+        loop = asyncio.get_running_loop()
+    except RuntimeError:
+        async_to_sync(channel_layer.group_send)(group_name, message)
+    else:
+        loop.create_task(channel_layer.group_send(group_name, message))
 
 
 def _send_group_event(group_name: str, *, event_type: str, payload: dict) -> None:
-    channel_layer = get_channel_layer()
-    if channel_layer is None:
-        return
-    message = {
-        "type": "broadcast.event",
-        "event_type": event_type,
-        "payload": payload,
-    }
-    try:
-        loop = asyncio.get_running_loop()
-    except RuntimeError:
-        async_to_sync(channel_layer.group_send)(group_name, message)
-    else:
-        loop.create_task(channel_layer.group_send(group_name, message))
+    _dispatch_group_message(
+        group_name,
+        build_broadcast_event(event_type=event_type, payload=payload),
+    )
 
 
 def _send_control_event(group_name: str, *, control_type: str, payload: dict) -> None:
-    channel_layer = get_channel_layer()
-    if channel_layer is None:
-        return
-    message = {
-        "type": control_type,
-        "payload": payload,
-    }
-    try:
-        loop = asyncio.get_running_loop()
-    except RuntimeError:
-        async_to_sync(channel_layer.group_send)(group_name, message)
-    else:
-        loop.create_task(channel_layer.group_send(group_name, message))
+    _dispatch_group_message(
+        group_name,
+        build_control_event(control_type=control_type, payload=payload),
+    )
 
 
 def publish_presence_payload(payload: dict) -> None:
@@ -153,7 +137,12 @@ def publish_friend_request_updated(friend_request) -> None:
         _send_group_event(
             user_group(user_id),
             event_type="friend_request.updated",
-            payload={"request": serialize_friend_request_update(item=friend_request, other_user=other_user)},
+            payload={
+                "request": serialize_friend_request_update(
+                    item=friend_request,
+                    other_user=other_user,
+                )
+            },
         )
 
 
@@ -193,12 +182,15 @@ def publish_room_invitation_created(invitation) -> None:
 
 
 def publish_room_membership_updated(*, room_id, user_id, action: str) -> None:
-    payload = {
-        "room_id": str(room_id),
-        "user_id": str(user_id),
-        "action": action,
-    }
-    _send_group_event(room_group(room_id), event_type="room.membership.updated", payload=payload)
+    _send_group_event(
+        room_group(room_id),
+        event_type="room.membership.updated",
+        payload={
+            "room_id": str(room_id),
+            "user_id": str(user_id),
+            "action": action,
+        },
+    )
 
 
 def force_room_unsubscribe(*, user_id, room_id) -> None:

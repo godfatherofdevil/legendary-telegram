@@ -270,7 +270,7 @@ Create the initial migration set for all required core entities.
 ---
 
 ### T3.2 Implement login and authenticated session creation
-**Status:** TODO
+**Status:** DONE
 
 #### Endpoints
 - `POST /api/v1/auth/login`
@@ -297,7 +297,7 @@ Create the initial migration set for all required core entities.
 ---
 
 ### T3.3 Implement logout and current-session invalidation
-**Status:** TODO
+**Status:** DONE
 
 #### Endpoint
 - `POST /api/v1/auth/logout`
@@ -316,7 +316,7 @@ Create the initial migration set for all required core entities.
 ---
 
 ### T3.4 Implement password change and reset flow
-**Status:** TODO
+**Status:** DONE
 
 #### Endpoints
 - `POST /api/v1/auth/change-password`
@@ -341,7 +341,7 @@ Create the initial migration set for all required core entities.
 ---
 
 ### T3.5 Implement account deletion
-**Status:** TODO
+**Status:** DONE
 
 #### Endpoint
 - `DELETE /api/v1/account`
@@ -364,7 +364,7 @@ Create the initial migration set for all required core entities.
 ---
 
 ### T3.6 Implement active session listing and targeted revocation
-**Status:** TODO
+**Status:** DONE
 
 #### Endpoints
 - `GET /api/v1/sessions`
@@ -390,7 +390,7 @@ Create the initial migration set for all required core entities.
 ## M4. Core Room and Dialog Domain
 
 ### T4.1 Implement user lookup endpoints
-**Status:** TODO
+**Status:** DONE
 
 #### Endpoints
 - `GET /api/v1/users/{user_id}`
@@ -408,7 +408,7 @@ Create the initial migration set for all required core entities.
 ---
 
 ### T4.2 Implement public room listing and joined room listing
-**Status:** TODO
+**Status:** DONE
 
 #### Endpoints
 - `GET /api/v1/rooms/public`
@@ -427,7 +427,7 @@ Create the initial migration set for all required core entities.
 ---
 
 ### T4.3 Implement room creation and detail retrieval
-**Status:** TODO
+**Status:** DONE
 
 #### Endpoints
 - `POST /api/v1/rooms`
@@ -448,7 +448,7 @@ Create the initial migration set for all required core entities.
 ---
 
 ### T4.4 Implement room update and room deletion
-**Status:** TODO
+**Status:** DONE
 
 #### Endpoints
 - `PATCH /api/v1/rooms/{room_id}`
@@ -469,7 +469,7 @@ Create the initial migration set for all required core entities.
 ---
 
 ### T4.5 Implement room join and leave flows
-**Status:** TODO
+**Status:** DONE
 
 #### Endpoints
 - `POST /api/v1/rooms/{room_id}/join`
@@ -490,7 +490,7 @@ Create the initial migration set for all required core entities.
 ---
 
 ### T4.6 Implement room member listing
-**Status:** TODO
+**Status:** DONE
 
 #### Endpoint
 - `GET /api/v1/rooms/{room_id}/members`
@@ -506,7 +506,7 @@ Create the initial migration set for all required core entities.
 ---
 
 ### T4.7 Implement personal dialog creation/retrieval and listing
-**Status:** TODO
+**Status:** DONE
 
 #### Endpoints
 - `GET /api/v1/dialogs`
@@ -528,7 +528,7 @@ Create the initial migration set for all required core entities.
 ## M5. Messaging and History
 
 ### T5.1 Implement room message model/services
-**Status:** TODO
+**Status:** DONE
 
 #### Objective
 Create service logic for room message lifecycle.
@@ -548,7 +548,7 @@ Create service logic for room message lifecycle.
 ---
 
 ### T5.2 Implement room message REST endpoints
-**Status:** TODO
+**Status:** DONE
 
 #### Endpoints
 - `GET /api/v1/rooms/{room_id}/messages`
@@ -572,7 +572,7 @@ Create service logic for room message lifecycle.
 ---
 
 ### T5.3 Implement dialog message model/services
-**Status:** TODO
+**Status:** DONE
 
 #### Requirements
 - MUST mirror room message features where contract requires parity
@@ -587,7 +587,7 @@ Create service logic for room message lifecycle.
 ---
 
 ### T5.4 Implement dialog message REST endpoints
-**Status:** TODO
+**Status:** DONE
 
 #### Endpoints
 - `GET /api/v1/dialogs/{dialog_id}/messages`
@@ -608,7 +608,7 @@ Create service logic for room message lifecycle.
 ---
 
 ### T5.5 Implement read markers and unread state
-**Status:** TODO
+**Status:** DONE
 
 #### Endpoints
 - `POST /api/v1/rooms/{room_id}/read`
@@ -628,7 +628,7 @@ Create service logic for room message lifecycle.
 ## M6. Attachments and File Access
 
 ### T6.1 Implement attachment upload and metadata model
-**Status:** TODO
+**Status:** DONE
 
 #### Requirements
 - MUST preserve original filename
@@ -643,7 +643,7 @@ Create service logic for room message lifecycle.
 ---
 
 ### T6.2 Implement attachment upload endpoint
-**Status:** TODO
+**Status:** DONE
 
 #### Endpoint
 - `POST /api/v1/attachments`
@@ -664,7 +664,7 @@ Create service logic for room message lifecycle.
 ---
 
 ### T6.3 Implement attachment retrieval and download authorization
-**Status:** TODO
+**Status:** DONE
 
 #### Endpoints
 - `GET /api/v1/attachments/{attachment_id}`
@@ -683,7 +683,7 @@ Create service logic for room message lifecycle.
 ---
 
 ### T6.4 Implement unbound attachment deletion
-**Status:** TODO
+**Status:** DONE
 
 #### Endpoint
 - `DELETE /api/v1/attachments/{attachment_id}`
@@ -701,7 +701,7 @@ Create service logic for room message lifecycle.
 ## M7. Presence and Unread State
 
 ### T7.1 Implement presence domain logic
-**Status:** TODO
+**Status:** DONE
 
 #### Requirements
 - MUST compute presence across tabs/sessions
@@ -719,7 +719,7 @@ Create service logic for room message lifecycle.
 ---
 
 ### T7.2 Implement presence query endpoint
-**Status:** TODO
+**Status:** DONE
 
 #### Endpoint
 - `POST /api/v1/presence/query`
@@ -735,7 +735,7 @@ Create service logic for room message lifecycle.
 ---
 
 ### T7.3 Implement notification summary endpoint
-**Status:** TODO
+**Status:** DONE
 
 #### Endpoint
 - `GET /api/v1/notifications/summary`
@@ -753,7 +753,7 @@ Create service logic for room message lifecycle.
 ## M8. Moderation, Bans, Invitations, and Friendship Flows
 
 ### T8.1 Implement friend request APIs
-**Status:** TODO
+**Status:** DONE
 
 #### Endpoints
 - `GET /api/v1/friends`
@@ -779,7 +779,7 @@ Create service logic for room message lifecycle.
 ---
 
 ### T8.2 Implement peer ban APIs and frozen dialog behavior
-**Status:** TODO
+**Status:** DONE
 
 #### Endpoints
 - `GET /api/v1/user-bans`
@@ -802,7 +802,7 @@ Create service logic for room message lifecycle.
 ---
 
 ### T8.3 Implement room invitations
-**Status:** TODO
+**Status:** DONE
 
 #### Endpoints
 - `POST /api/v1/rooms/{room_id}/invitations`
@@ -824,7 +824,7 @@ Create service logic for room message lifecycle.
 ---
 
 ### T8.4 Implement room admin role management
-**Status:** TODO
+**Status:** DONE
 
 #### Endpoints
 - `POST /api/v1/rooms/{room_id}/admins`
@@ -845,7 +845,7 @@ Create service logic for room message lifecycle.
 ---
 
 ### T8.5 Implement room member removal, bans, and unbans
-**Status:** TODO
+**Status:** DONE
 
 #### Endpoints
 - `POST /api/v1/rooms/{room_id}/remove-member`
@@ -871,7 +871,7 @@ Create service logic for room message lifecycle.
 ## M9. WebSocket Real-Time Protocol
 
 ### T9.1 Implement authenticated WebSocket connection
-**Status:** TODO
+**Status:** DONE
 
 #### Endpoint
 - `/ws/v1/chat`
@@ -888,7 +888,7 @@ Create service logic for room message lifecycle.
 ---
 
 ### T9.2 Implement basic WebSocket protocol primitives
-**Status:** TODO
+**Status:** DONE
 
 #### Events
 - `ping`
@@ -909,7 +909,7 @@ Create service logic for room message lifecycle.
 ---
 
 ### T9.3 Implement room/dialog subscription events
-**Status:** TODO
+**Status:** DONE
 
 #### Events
 - `room.subscribe`
@@ -929,7 +929,7 @@ Create service logic for room message lifecycle.
 ---
 
 ### T9.4 Implement WebSocket message send/edit/delete flows
-**Status:** TODO
+**Status:** DONE
 
 #### Events
 - `room.message.send`
@@ -953,7 +953,7 @@ Create service logic for room message lifecycle.
 ---
 
 ### T9.5 Implement WebSocket read-state events
-**Status:** TODO
+**Status:** DONE
 
 #### Events
 - `room.read`
@@ -972,7 +972,7 @@ Create service logic for room message lifecycle.
 ---
 
 ### T9.6 Implement presence heartbeat and presence update events
-**Status:** TODO
+**Status:** DONE
 
 #### Events
 - `presence.heartbeat`
@@ -991,7 +991,7 @@ Create service logic for room message lifecycle.
 ---
 
 ### T9.7 Implement friend request and invitation WebSocket notifications
-**Status:** TODO
+**Status:** DONE
 
 #### Events
 - `friend_request.created`
@@ -1012,7 +1012,7 @@ Create service logic for room message lifecycle.
 ## M10. UI Integration
 
 ### T10.1 Implement authentication UI
-**Status:** TODO
+**Status:** IN PROGRESS
 
 #### Requirements
 - sign in
@@ -1026,7 +1026,7 @@ Create service logic for room message lifecycle.
 ---
 
 ### T10.2 Implement classic chat layout
-**Status:** TODO
+**Status:** IN PROGRESS
 
 #### Requirements
 - top navigation
@@ -1041,7 +1041,7 @@ Create service logic for room message lifecycle.
 ---
 
 ### T10.3 Implement room and dialog lists
-**Status:** TODO
+**Status:** IN PROGRESS
 
 #### Requirements
 - show rooms and contacts
@@ -1052,7 +1052,7 @@ Create service logic for room message lifecycle.
 ---
 
 ### T10.4 Implement message history and composition UI
-**Status:** TODO
+**Status:** IN PROGRESS
 
 #### Requirements
 - infinite scroll
@@ -1065,7 +1065,7 @@ Create service logic for room message lifecycle.
 ---
 
 ### T10.5 Implement moderation and admin UI
-**Status:** TODO
+**Status:** IN PROGRESS
 
 #### Requirements
 - manage room members
@@ -1079,7 +1079,7 @@ Create service logic for room message lifecycle.
 ---
 
 ### T10.6 Implement sessions UI
-**Status:** TODO
+**Status:** IN PROGRESS
 
 #### Requirements
 - show active sessions
@@ -1125,10 +1125,132 @@ Create service logic for room message lifecycle.
 
 ---
 
-## M12. Cross-Cutting Verification
+## M12. Migrate to Redis-backed realtime architecture
 
-### T12.1 Add contract compliance tests
+### T12.0 Baseline, flags, and observability
+**Status:** IN PROGRESS
+
+#### Objective
+Establish the migration guardrails defined in `docs/MIGRATION_TASKS.md` Milestone 0 before changing live behavior.
+
+#### Current State
+- migration feature flags exist in backend settings
+- `docs/MIGRATION_PLAN.md` exists
+- `apps/chat/realtime/` exists and is already used by the current websocket path
+- required migration package, rollback docs, milestone docs, and observability work are not yet complete
+
+---
+
+### T12.1 Canonical event contract
 **Status:** TODO
+
+#### Objective
+Add the canonical internal event contract from `docs/MIGRATION_TASKS.md` Milestone 1.
+
+#### Current State
+- contract-style websocket payloads exist for live clients
+- `apps/chat/events/`, `docs/EVENT_CONTRACT.md`, and migration-specific contract tests do not yet exist
+
+---
+
+### T12.2 Redis presence and connection registry
+**Status:** TODO
+
+#### Objective
+Move presence, typing, and connection routing to Redis-backed abstractions per `docs/MIGRATION_TASKS.md` Milestone 2.
+
+#### Current State
+- presence is implemented and tested
+- current presence storage is SQL-backed through `apps.presence.models.UserPresenceConnection`
+- Redis presence abstractions, key documentation, and parity checks are not yet implemented
+
+---
+
+### T12.3 Redis-backed live fanout
+**Status:** IN PROGRESS
+
+#### Objective
+Move live room and user fanout onto Redis-backed Channels groups per `docs/MIGRATION_TASKS.md` Milestone 3.
+
+#### Current State
+- `apps/chat/realtime/fanout.py`, `groups.py`, `routing.py`, and websocket tests already exist
+- stable room, dialog, user, and presence group naming is implemented
+- migration-specific flag-driven cutover, rollback verification, and parity checks are not yet complete
+
+---
+
+### T12.4 Stream publishing in shadow mode
+**Status:** TODO
+
+#### Objective
+Publish canonical chat events to Redis Streams in additive shadow mode per `docs/MIGRATION_TASKS.md` Milestone 4.
+
+#### Current State
+- stream publishing feature flags exist
+- no `apps/chat/events/publishers.py`, `stream_names.py`, or stream publish integration tests exist yet
+
+---
+
+### T12.5 Persistence workers and dual-write parity
+**Status:** TODO
+
+#### Objective
+Introduce Redis Stream consumers that persist to PostgreSQL with idempotency and parity checks per `docs/MIGRATION_TASKS.md` Milestone 5.
+
+#### Current State
+- worker package and persistence worker implementation are not present
+- parity and reconciliation tooling for durable writes is not present
+
+---
+
+### T12.6 Async persistence cutover
+**Status:** TODO
+
+#### Objective
+Remove synchronous PostgreSQL persistence from the live send critical path per `docs/MIGRATION_TASKS.md` Milestone 6.
+
+#### Current State
+- current room and dialog message creation still persists in the request/consumer path before broadcast
+- accepted versus stored state transitions are not modeled yet
+
+---
+
+### T12.7 Derived-write removal from hot path
+**Status:** TODO
+
+#### Objective
+Move unread updates and other derived writes off the send hot path per `docs/MIGRATION_TASKS.md` Milestone 7.
+
+#### Current State
+- unread and summary behavior exists in the synchronous application path
+- projection workers and rebuild tooling do not yet exist
+
+---
+
+### T12.8 Reconciliation hardening and backfill tooling
+**Status:** TODO
+
+#### Objective
+Add rebuild, repair, backfill, and runbook tooling per `docs/MIGRATION_TASKS.md` Milestone 8.
+
+#### Current State
+- migration runbooks and operational tooling are not yet present
+
+---
+
+### T12.9 Legacy path retirement
+**Status:** TODO
+
+#### Objective
+Retire legacy PostgreSQL-hot-path realtime behavior only after the migrated architecture is proven per `docs/MIGRATION_TASKS.md` Milestone 9.
+
+#### Current State
+- not started; preconditions from earlier migration milestones are not met
+
+## M13. Cross-Cutting Verification
+
+### T13.1 Add contract compliance tests
+**Status:** IN PROGRESS
 
 #### Objective
 Ensure API behavior matches `API_CONTRACT.md`.
@@ -1143,8 +1265,8 @@ Ensure API behavior matches `API_CONTRACT.md`.
 
 ---
 
-### T12.2 Add permission matrix tests
-**Status:** TODO
+### T13.2 Add permission matrix tests
+**Status:** IN PROGRESS
 
 #### Objective
 Verify the authorization matrix from `API_CONTRACT.md`.
@@ -1158,7 +1280,7 @@ Verify the authorization matrix from `API_CONTRACT.md`.
 
 ---
 
-### T12.3 Add deletion and access-revocation tests
+### T13.3 Add deletion and access-revocation tests
 **Status:** TODO
 
 #### Objective
@@ -1173,7 +1295,7 @@ Verify the highest-risk data and access flows.
 
 ---
 
-### T12.4 Add performance-sane query/path checks
+### T13.4 Add performance-sane query/path checks
 **Status:** TODO
 
 #### Objective
@@ -1187,11 +1309,11 @@ Catch obvious scalability mistakes early.
 
 ---
 
-## M13. Optional Advanced Scope
+## M14. Optional Advanced Scope
 
 This milestone MUST NOT begin until all required milestones above are complete and stable.
 
-### T13.1 Add XMPP/Jabber integration plan
+### T14.1 Add XMPP/Jabber integration plan
 **Status:** TODO
 
 #### Requirements
@@ -1201,7 +1323,7 @@ This milestone MUST NOT begin until all required milestones above are complete a
 
 ---
 
-### T13.2 Implement XMPP client connectivity
+### T14.2 Implement XMPP client connectivity
 **Status:** TODO
 
 #### Requirements
@@ -1210,7 +1332,7 @@ This milestone MUST NOT begin until all required milestones above are complete a
 
 ---
 
-### T13.3 Implement federation between two servers
+### T14.3 Implement federation between two servers
 **Status:** TODO
 
 #### Requirements
@@ -1219,7 +1341,7 @@ This milestone MUST NOT begin until all required milestones above are complete a
 
 ---
 
-### T13.4 Implement Jabber/federation admin UI
+### T14.4 Implement Jabber/federation admin UI
 **Status:** TODO
 
 #### Requirements
@@ -1228,7 +1350,7 @@ This milestone MUST NOT begin until all required milestones above are complete a
 
 ---
 
-### T13.5 Add federation load test scenario
+### T14.5 Add federation load test scenario
 **Status:** TODO
 
 #### Requirements

@@ -2,8 +2,8 @@ import pytest
 from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.core import mail
-from django.urls import reverse
 from django.test import override_settings
+from django.urls import reverse
 from rest_framework.test import APIClient
 
 from apps.accounts.models import PasswordResetToken, UserSession
@@ -344,7 +344,11 @@ def test_delete_account_removes_owned_room_data(api_client: APIClient) -> None:
         size_bytes=5,
     )
     RoomMessageAttachment.objects.create(room_message=room_message, attachment=attachment)
-    api_client.force_login(owner)
+    login_response = api_client.post(
+        reverse("auth-login"),
+        {"email": owner.email, "password": "StrongPassword123!", "remember_me": True},
+        format="json",
+    )
 
     response = api_client.delete(
         reverse("account-delete"),
@@ -352,8 +356,11 @@ def test_delete_account_removes_owned_room_data(api_client: APIClient) -> None:
         format="json",
     )
 
+    assert login_response.status_code == 200
     assert response.status_code == 204
+    assert api_client.get(reverse("auth-me")).status_code == 401
     assert not User.objects.filter(id=owner.id).exists()
     assert not Room.objects.filter(id=owned_room.id).exists()
     assert not RoomMembership.objects.filter(room=other_room, user=owner).exists()
     assert not Attachment.objects.filter(id=attachment.id).exists()
+    assert not UserSession.objects.filter(user_id=owner.id).exists()
