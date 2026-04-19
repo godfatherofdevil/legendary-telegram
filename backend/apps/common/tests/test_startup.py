@@ -6,6 +6,7 @@ import time
 from pathlib import Path
 
 import pytest
+from django.core.exceptions import ImproperlyConfigured
 from django.core.management import call_command
 from django.db.migrations.exceptions import InconsistentMigrationHistory
 from django.urls import resolve
@@ -46,6 +47,11 @@ def test_admin_route_is_registered() -> None:
 def test_auth_login_route_is_registered() -> None:
     match = resolve("/api/v1/auth/login")
     assert match is not None
+
+
+def test_health_routes_are_registered() -> None:
+    assert resolve("/health/live/") is not None
+    assert resolve("/health/ready/") is not None
 
 
 def test_run_startup_migrations_recovers_known_inconsistent_history(monkeypatch) -> None:
@@ -90,6 +96,38 @@ def test_reset_sqlite_database_removes_existing_file(tmp_path) -> None:
     startup.reset_sqlite_database({"NAME": str(database_path)})
 
     assert not database_path.exists()
+
+
+def test_validate_runtime_configuration_rejects_default_secret_key_in_non_debug(
+    monkeypatch,
+) -> None:
+    monkeypatch.setattr(startup.settings, "DEBUG", False)
+    monkeypatch.setattr(startup.settings, "SECRET_KEY", startup.settings.LOCAL_DEV_SECRET_KEY)
+    monkeypatch.setattr(startup.settings, "ALLOWED_HOSTS", ["localhost"])
+
+    with pytest.raises(ImproperlyConfigured):
+        startup.validate_runtime_configuration()
+
+
+def test_validate_runtime_configuration_requires_allowed_hosts_in_non_debug(monkeypatch) -> None:
+    monkeypatch.setattr(startup.settings, "DEBUG", False)
+    monkeypatch.setattr(startup.settings, "SECRET_KEY", "production-secret")
+    monkeypatch.setattr(startup.settings, "ALLOWED_HOSTS", [])
+
+    with pytest.raises(ImproperlyConfigured):
+        startup.validate_runtime_configuration()
+
+
+def test_prepare_runtime_directories_creates_media_and_static_dirs(tmp_path, monkeypatch) -> None:
+    media_root = tmp_path / "media"
+    static_root = tmp_path / "staticfiles"
+    monkeypatch.setattr(startup.settings, "MEDIA_ROOT", media_root)
+    monkeypatch.setattr(startup.settings, "STATIC_ROOT", static_root)
+
+    startup.prepare_runtime_directories()
+
+    assert media_root.is_dir()
+    assert static_root.is_dir()
 
 
 def _write_fake_executable(path: Path, contents: str) -> None:

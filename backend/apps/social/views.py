@@ -2,7 +2,11 @@ from rest_framework import status
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from apps.chat.realtime import publish_friend_request_created
+from apps.chat.realtime import (
+    publish_dialog_summary_updated,
+    publish_friend_request_created,
+    publish_friend_request_updated,
+)
 from apps.common.api import error_response, success_response
 from apps.social.serializers import (
     FriendRequestCreateSerializer,
@@ -117,6 +121,7 @@ class FriendRequestAcceptView(APIView):
                     status_code=status.HTTP_404_NOT_FOUND,
                 )
             raise
+        publish_friend_request_updated(friendship.request)
         return success_response(
             {
                 "friendship": serialize_friend_item(
@@ -131,7 +136,7 @@ class FriendRequestAcceptView(APIView):
 class FriendRequestRejectView(APIView):
     def post(self, request, request_id):
         try:
-            reject_friend_request(request_id=request_id, actor=request.user)
+            friend_request = reject_friend_request(request_id=request_id, actor=request.user)
         except SocialConflictError as exc:
             return error_response(
                 code="conflict",
@@ -146,13 +151,14 @@ class FriendRequestRejectView(APIView):
                     status_code=status.HTTP_404_NOT_FOUND,
                 )
             raise
+        publish_friend_request_updated(friend_request)
         return Response(status=status.HTTP_204_NO_CONTENT)
 
 
 class FriendDetailView(APIView):
     def delete(self, request, user_id):
         try:
-            remove_friend(actor=request.user, other_user_id=user_id)
+            dialog = remove_friend(actor=request.user, other_user_id=user_id)
         except Exception as exc:
             if exc.__class__.__name__ == "DoesNotExist":
                 return error_response(
@@ -161,6 +167,8 @@ class FriendDetailView(APIView):
                     status_code=status.HTTP_404_NOT_FOUND,
                 )
             raise
+        if dialog is not None:
+            publish_dialog_summary_updated(dialog)
         return Response(status=status.HTTP_204_NO_CONTENT)
 
 

@@ -1091,7 +1091,7 @@ Create service logic for room message lifecycle.
 ## M11. Deployment Hardening
 
 ### T11.1 Align deployment with DEPLOYMENT.md
-**Status:** TODO
+**Status:** DONE
 
 #### Requirements
 - implementation MUST match documented deployment steps
@@ -1103,7 +1103,7 @@ Create service logic for room message lifecycle.
 ---
 
 ### T11.2 Finalize environment configuration
-**Status:** TODO
+**Status:** DONE
 
 #### Requirements
 - document required env vars
@@ -1113,7 +1113,7 @@ Create service logic for room message lifecycle.
 ---
 
 ### T11.3 Validate storage, static/media, and service wiring
-**Status:** TODO
+**Status:** DONE
 
 #### Requirements
 - local filesystem attachment storage works
@@ -1350,4 +1350,3 @@ When choosing between cleverness and maintainability, implementers MUST choose m
 This task plan exists to ensure the repository reaches a secure, testable, deployable, and spec-compliant implementation.
 
 ---
-

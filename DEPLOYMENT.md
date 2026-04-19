@@ -82,17 +82,23 @@ DJANGO_DEBUG=1
 DJANGO_ALLOWED_HOSTS=localhost,127.0.0.1,backend
 DJANGO_CSRF_TRUSTED_ORIGINS=http://localhost:3000,http://127.0.0.1:3000
 DJANGO_CORS_ALLOWED_ORIGINS=http://localhost:3000,http://127.0.0.1:3000
+DJANGO_USE_X_FORWARDED_HOST=0
+DJANGO_SECURE_SSL_REDIRECT=0
+DJANGO_SECURE_HSTS_SECONDS=0
 
 DATABASE_URL=postgresql://chat_user:chat_password@postgres:5432/chat_app
 REDIS_URL=redis://redis:6379/0
 
 FRONTEND_API_BASE_URL=http://localhost:8000/api/v1
 FRONTEND_WS_BASE_URL=ws://localhost:8000/ws/v1/chat
+FRONTEND_PROXY_TARGET=http://backend:8000
 ```
 
 ### Rules
 
 * Local secrets in `.env` MUST NOT be reused in production.
+* When `DJANGO_DEBUG=0`, `DJANGO_SECRET_KEY` MUST be set to a non-default value and `DJANGO_ALLOWED_HOSTS` MUST be non-empty.
+* `DJANGO_SECURE_SSL_REDIRECT`, `DJANGO_USE_X_FORWARDED_HOST`, and `DJANGO_SECURE_HSTS_SECONDS` SHOULD be configured explicitly when running behind TLS termination or a reverse proxy.
 * `DATABASE_URL` MUST point to the `postgres` service hostname.
 * `REDIS_URL` MUST point to the `redis` service hostname.
 * Frontend API and WebSocket URLs SHOULD target the backend’s exposed local port.
@@ -110,6 +116,7 @@ services:
   postgres:
     image: postgres:16
     container_name: chat_postgres
+    init: true
     restart: unless-stopped
     env_file:
       - .env
@@ -130,6 +137,7 @@ services:
   redis:
     image: redis:7
     container_name: chat_redis
+    init: true
     restart: unless-stopped
     ports:
       - "${REDIS_PORT:-6379}:6379"
@@ -146,6 +154,7 @@ services:
       context: ./backend
       dockerfile: Dockerfile
     container_name: chat_backend
+    init: true
     restart: unless-stopped
     env_file:
       - .env
@@ -158,29 +167,45 @@ services:
       - "${BACKEND_PORT:-8000}:8000"
     volumes:
       - ./backend:/app
+      - media_data:/app/media
     command: ["/app/entrypoint.sh"]
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health/ready/', timeout=5)"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 20s
 
   frontend:
     build:
       context: ./frontend
       dockerfile: Dockerfile
     container_name: chat_frontend
+    init: true
     restart: unless-stopped
     env_file:
       - .env
     depends_on:
-      - backend
+      backend:
+        condition: service_healthy
     ports:
       - "${FRONTEND_PORT:-3000}:3000"
     volumes:
       - ./frontend:/app
       - frontend_node_modules:/app/node_modules
     command: ["npm", "run", "dev", "--", "--host", "0.0.0.0", "--port", "3000"]
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3000/', { signal: AbortSignal.timeout(5000) }).then((response) => { if (!response.ok) process.exit(1); }).catch(() => process.exit(1))"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 20s
 
 volumes:
   postgres_data:
   redis_data:
   frontend_node_modules:
+  media_data:
 ```
 
 ---
@@ -268,6 +293,8 @@ docker compose up -d postgres redis
 docker compose up backend
 ```
 
+The backend is healthy only when `GET /health/ready/` returns `200 OK`. The readiness endpoint verifies database connectivity and that the local media root exists for attachment storage.
+
 ### Step 4: Verify backend
 
 Open:
@@ -310,6 +337,8 @@ docker compose up -d postgres redis backend
 ```bash
 docker compose up frontend
 ```
+
+The frontend service waits for the backend health check before starting.
 
 ### Step 4: Verify frontend
 

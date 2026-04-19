@@ -6,10 +6,12 @@ from channels.layers import get_channel_layer
 from apps.chat.models import DialogMessage, RoomMessage
 from apps.chat.serializers import (
     _isoformat,
+    serialize_dialog_summary_for_user,
     serialize_dialog_message,
     serialize_room_message,
 )
-from apps.social.serializers import serialize_incoming_friend_request
+from apps.chat.services import get_dialog_unread_count
+from apps.social.serializers import serialize_friend_request_update, serialize_incoming_friend_request
 
 PRESENCE_GROUP = "presence.all"
 
@@ -141,6 +143,38 @@ def publish_friend_request_created(friend_request) -> None:
         event_type="friend_request.created",
         payload={"request": serialize_incoming_friend_request(friend_request)},
     )
+
+
+def publish_friend_request_updated(friend_request) -> None:
+    for user_id, other_user in (
+        (friend_request.from_user_id, friend_request.to_user),
+        (friend_request.to_user_id, friend_request.from_user),
+    ):
+        _send_group_event(
+            user_group(user_id),
+            event_type="friend_request.updated",
+            payload={"request": serialize_friend_request_update(item=friend_request, other_user=other_user)},
+        )
+
+
+def publish_dialog_summary_updated(dialog, *, recipients=None, last_message=None) -> None:
+    recipient_ids = recipients
+    if recipient_ids is None:
+        recipient_ids = [dialog.user_low_id, dialog.user_high_id]
+    for recipient_id in recipient_ids:
+        recipient = dialog.user_low if dialog.user_low_id == recipient_id else dialog.user_high
+        _send_group_event(
+            user_group(recipient_id),
+            event_type="dialog.summary.updated",
+            payload={
+                "dialog": serialize_dialog_summary_for_user(
+                    dialog=dialog,
+                    user=recipient,
+                    unread_count=get_dialog_unread_count(dialog=dialog, user=recipient),
+                    last_message=last_message,
+                )
+            },
+        )
 
 
 def publish_room_invitation_created(invitation) -> None:

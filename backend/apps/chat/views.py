@@ -12,6 +12,7 @@ from apps.chat.realtime import (
     publish_dialog_message_deleted,
     publish_dialog_message_updated,
     publish_dialog_read_updated,
+    publish_dialog_summary_updated,
     publish_room_invitation_created,
     publish_room_membership_updated,
     publish_room_message_created,
@@ -606,7 +607,7 @@ class DialogListCreateView(APIView):
                 status_code=status.HTTP_404_NOT_FOUND,
             )
         try:
-            dialog, _created = get_or_create_dialog(
+            dialog, created = get_or_create_dialog(
                 current_user=request.user, other_user=other_user
             )
         except DomainForbiddenError as exc:
@@ -615,6 +616,8 @@ class DialogListCreateView(APIView):
                 message=str(exc),
                 status_code=status.HTTP_403_FORBIDDEN,
             )
+        if created:
+            publish_dialog_summary_updated(dialog)
         return success_response({"dialog": serialize_dialog_create(dialog, other_user)})
 
 
@@ -829,6 +832,7 @@ class DialogMessageListCreateView(APIView):
                 )
             raise
         publish_dialog_message_created(message)
+        publish_dialog_summary_updated(message.dialog, last_message=message)
         return success_response(
             {"message": serialize_dialog_message(message)}, status.HTTP_201_CREATED
         )

@@ -236,17 +236,23 @@ DJANGO_DEBUG=1
 DJANGO_ALLOWED_HOSTS=localhost,127.0.0.1,backend
 DJANGO_CSRF_TRUSTED_ORIGINS=http://localhost:3000,http://127.0.0.1:3000
 DJANGO_CORS_ALLOWED_ORIGINS=http://localhost:3000,http://127.0.0.1:3000
+DJANGO_USE_X_FORWARDED_HOST=0
+DJANGO_SECURE_SSL_REDIRECT=0
+DJANGO_SECURE_HSTS_SECONDS=0
 
 DATABASE_URL=postgresql://chat_user:chat_password@postgres:5432/chat_app
 REDIS_URL=redis://redis:6379/0
 
 FRONTEND_API_BASE_URL=http://localhost:8000/api/v1
 FRONTEND_WS_BASE_URL=ws://localhost:8000/ws/v1/chat
+FRONTEND_PROXY_TARGET=http://backend:8000
 ```
 
 ### Notes
 
 * local secrets must not be reused in production
+* when `DJANGO_DEBUG=0`, startup rejects the default `DJANGO_SECRET_KEY` and an empty `DJANGO_ALLOWED_HOSTS`
+* `DJANGO_SECURE_SSL_REDIRECT`, `DJANGO_USE_X_FORWARDED_HOST`, and `DJANGO_SECURE_HSTS_SECONDS` are the main deployment-time hardening toggles for reverse-proxied HTTPS setups
 * backend container should use service hostnames like `postgres` and `redis`
 * frontend should point to backend via localhost-exposed port in browser context
 
@@ -269,6 +275,13 @@ docker compose up --build
 ```
 
 The backend Compose service enables guarded local recovery for a stale Postgres volume that still records `admin.0001_initial` before `accounts.0001_initial`. In that exact case, startup resets the local database schema and reapplies migrations so the custom user model boots cleanly.
+
+The Compose stack also exposes explicit health checks:
+
+* backend readiness: `http://localhost:8000/health/ready/`
+* backend liveness: `http://localhost:8000/health/live/`
+
+`frontend` waits for `backend` readiness before starting, and backend readiness verifies database connectivity plus local media directory availability for attachment storage.
 
 ## 10.3 Verify services
 
@@ -495,9 +508,9 @@ The local setup is considered healthy only if all of the following are true:
 
 * postgres is running
 * redis is running
-* backend starts successfully
+* backend starts successfully and `/health/ready/` returns `200`
 * migrations apply successfully
-* frontend starts successfully
+* frontend starts successfully and Compose reports it healthy
 * frontend can call backend REST API
 * frontend can connect to backend WebSocket endpoint
 

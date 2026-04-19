@@ -9,7 +9,13 @@ from django.http.cookie import parse_cookie
 from rest_framework import serializers
 
 from apps.chat.models import Dialog, Room
-from apps.chat.realtime import PRESENCE_GROUP, dialog_group, room_group, user_group
+from apps.chat.realtime import (
+    PRESENCE_GROUP,
+    dialog_group,
+    publish_dialog_summary_updated,
+    room_group,
+    user_group,
+)
 from apps.chat.serializers import serialize_dialog_message, serialize_room_message
 from apps.chat.services import (
     DomainForbiddenError,
@@ -278,6 +284,7 @@ class ChatConsumer(AsyncJsonWebsocketConsumer):
             event_type="dialog.message.created",
             payload=payload,
         )
+        publish_dialog_summary_updated(message.dialog, last_message=message)
 
     async def _handle_room_message_edit(self, payload, request_id):
         serializer = RoomMessageEditSerializer(data=payload)

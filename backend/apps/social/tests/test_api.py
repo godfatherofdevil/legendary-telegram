@@ -62,6 +62,29 @@ def test_friend_request_list_and_accept_flow(api_client: APIClient) -> None:
 
 
 @pytest.mark.django_db
+def test_friend_list_returns_existing_friendships(api_client: APIClient) -> None:
+    alice = create_user(email="alice-friends@example.com", username="alice-friends")
+    bob = create_user(email="bob-friends@example.com", username="bob-friends")
+    friendship = make_friends(alice, bob)
+
+    api_client.force_login(alice)
+
+    response = api_client.get(reverse("friend-list"))
+
+    assert response.status_code == 200
+    assert response.json()["data"] == [
+        {
+            "user": {
+                "id": str(bob.id),
+                "username": "bob-friends",
+                "presence": "offline",
+            },
+            "friend_since": friendship.created_at.isoformat().replace("+00:00", "Z"),
+        }
+    ]
+
+
+@pytest.mark.django_db
 def test_friend_request_reject_and_conflict_rules(api_client: APIClient) -> None:
     alice = create_user(email="alice-reject@example.com", username="alice-reject")
     bob = create_user(email="bob-reject@example.com", username="bob-reject")
@@ -134,3 +157,36 @@ def test_remove_friend_and_peer_ban_update_dialog_state(api_client: APIClient) -
     assert remove_ban_response.status_code == 204
     dialog.refresh_from_db()
     assert dialog.is_frozen is True
+
+
+@pytest.mark.django_db
+def test_remove_friend_updates_other_user_reload_state(api_client: APIClient) -> None:
+    alice = create_user(email="alice-remove@example.com", username="alice-remove")
+    bob = create_user(email="bob-remove@example.com", username="bob-remove")
+    make_friends(alice, bob)
+    user_low, user_high = sorted([alice, bob], key=lambda user: str(user.id))
+    dialog = Dialog.objects.create(user_low=user_low, user_high=user_high)
+
+    alice_client = APIClient()
+    alice_client.force_login(alice)
+    bob_client = APIClient()
+    bob_client.force_login(bob)
+
+    response = alice_client.delete(reverse("friend-detail", kwargs={"user_id": bob.id}))
+
+    assert response.status_code == 204
+    assert alice_client.get(reverse("friend-list")).json()["data"] == []
+    assert bob_client.get(reverse("friend-list")).json()["data"] == []
+    assert bob_client.get(reverse("dialog-list-create")).json()["data"] == [
+        {
+            "id": str(dialog.id),
+            "other_user": {
+                "id": str(alice.id),
+                "username": "alice-remove",
+                "presence": "offline",
+            },
+            "last_message": None,
+            "unread_count": 0,
+            "is_frozen": True,
+        }
+    ]

@@ -56,6 +56,15 @@ def serialize_created_friend_request(item) -> dict:
     }
 
 
+def serialize_friend_request_update(*, item, other_user: User) -> dict:
+    return {
+        "id": str(item.id),
+        "status": item.status,
+        "other_user": serialize_public_user(other_user, include_presence=False),
+        "responded_at": _isoformat(item.responded_at),
+    }
+
+
 def serialize_peer_ban(item) -> dict:
     return {
         "user": serialize_public_user(item.target_user, include_presence=False),

@@ -594,6 +594,20 @@ def list_dialog_rows(*, user: User):
     return dialogs, unread_counts, last_messages
 
 
+def get_dialog_unread_count(*, dialog: Dialog, user: User) -> int:
+    if dialog.user_low_id != user.id and dialog.user_high_id != user.id:
+        raise Dialog.DoesNotExist
+    last_read_at = (
+        DialogReadState.objects.filter(dialog=dialog, user=user)
+        .values_list("last_read_at", flat=True)
+        .first()
+    )
+    queryset = DialogMessage.objects.filter(dialog=dialog).exclude(sender_user=user)
+    if last_read_at is not None:
+        queryset = queryset.filter(created_at__gt=last_read_at)
+    return queryset.count()
+
+
 def list_room_message_rows(
     *, room: Room, user: User, page: PageWindow
 ) -> tuple[list[RoomMessage], bool]:

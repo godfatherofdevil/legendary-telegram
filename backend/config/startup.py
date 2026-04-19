@@ -2,6 +2,8 @@ import os
 from pathlib import Path
 
 import django
+from django.conf import settings
+from django.core.exceptions import ImproperlyConfigured
 from django.core.management import call_command
 from django.db import connections
 from django.db.migrations.exceptions import InconsistentMigrationHistory
@@ -79,9 +81,31 @@ def _run_migrate() -> None:
     call_command("migrate", interactive=False, verbosity=1)
 
 
+def validate_runtime_configuration() -> None:
+    if settings.DEBUG:
+        return
+
+    if not settings.SECRET_KEY or settings.SECRET_KEY == settings.LOCAL_DEV_SECRET_KEY:
+        raise ImproperlyConfigured(
+            "DJANGO_SECRET_KEY must be set to a non-default value when DJANGO_DEBUG=0."
+        )
+
+    if not settings.ALLOWED_HOSTS:
+        raise ImproperlyConfigured(
+            "DJANGO_ALLOWED_HOSTS must include at least one host when DJANGO_DEBUG=0."
+        )
+
+
+def prepare_runtime_directories() -> None:
+    for directory in (Path(settings.MEDIA_ROOT), Path(settings.STATIC_ROOT)):
+        directory.mkdir(parents=True, exist_ok=True)
+
+
 def main() -> None:
     os.environ.setdefault("DJANGO_SETTINGS_MODULE", "config.settings")
     django.setup()
+    validate_runtime_configuration()
+    prepare_runtime_directories()
     run_startup_migrations()
 
 

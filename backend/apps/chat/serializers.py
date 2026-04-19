@@ -180,6 +180,18 @@ def serialize_dialog_summary(
     return payload
 
 
+def serialize_dialog_summary_for_user(
+    *, dialog: Dialog, user: User, unread_count: int, last_message: DialogMessage | None
+) -> dict:
+    other_user = dialog.user_high if dialog.user_low_id == user.id else dialog.user_low
+    return serialize_dialog_summary(
+        dialog=dialog,
+        other_user=other_user,
+        unread_count=unread_count,
+        last_message=last_message,
+    )
+
+
 def serialize_dialog_create(dialog: Dialog, other_user: User) -> dict:
     return {
         "id": str(dialog.id),

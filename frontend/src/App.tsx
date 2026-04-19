@@ -165,6 +165,14 @@ function compactCount(value: number): string {
   return "99+";
 }
 
+function isImageAttachment(contentType: string): boolean {
+  return contentType.toLowerCase().startsWith("image/");
+}
+
+function isVideoAttachment(contentType: string): boolean {
+  return contentType.toLowerCase().startsWith("video/");
+}
+
 function upsertMessage(list: Message[], message: Message): Message[] {
   const existingIndex = list.findIndex((item) => item.id === message.id);
   if (existingIndex >= 0) {
@@ -173,6 +181,10 @@ function upsertMessage(list: Message[], message: Message): Message[] {
     return next.sort((left, right) => left.created_at.localeCompare(right.created_at));
   }
   return [...list, message].sort((left, right) => left.created_at.localeCompare(right.created_at));
+}
+
+function upsertDialog(list: DialogSummary[], dialog: DialogSummary): DialogSummary[] {
+  return [dialog, ...list.filter((item) => item.id !== dialog.id)];
 }
 
 function removeMessage(list: Message[], messageId: string): Message[] {
@@ -210,6 +222,196 @@ function isChatEqual(left: ActiveChat | null, right: ActiveChat | null): boolean
     return left === right;
   }
   return left.kind === right.kind && left.id === right.id;
+}
+
+type IconName =
+  | "leave"
+  | "reply"
+  | "edit"
+  | "delete"
+  | "save"
+  | "cancel"
+  | "clear"
+  | "attach"
+  | "send"
+  | "promote"
+  | "demote"
+  | "remove"
+  | "ban"
+  | "unban"
+  | "invite"
+  | "friend-remove"
+  | "peer-ban"
+  | "peer-unban";
+
+function Icon(props: { name: IconName }) {
+  const common = {
+    fill: "none",
+    stroke: "currentColor",
+    strokeLinecap: "round" as const,
+    strokeLinejoin: "round" as const,
+    strokeWidth: 1.8,
+  };
+
+  switch (props.name) {
+    case "leave":
+      return (
+        <svg aria-hidden="true" viewBox="0 0 24 24">
+          <path {...common} d="M10 17l-5-5 5-5" />
+          <path {...common} d="M5 12h10" />
+          <path {...common} d="M14 5h3a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2h-3" />
+        </svg>
+      );
+    case "reply":
+      return (
+        <svg aria-hidden="true" viewBox="0 0 24 24">
+          <path {...common} d="M10 9l-5 4 5 4" />
+          <path {...common} d="M5 13h8a6 6 0 0 1 6 6" />
+          <path {...common} d="M13 7a6 6 0 0 1 6 6" />
+        </svg>
+      );
+    case "edit":
+      return (
+        <svg aria-hidden="true" viewBox="0 0 24 24">
+          <path {...common} d="M4 20h4l10-10-4-4L4 16v4z" />
+          <path {...common} d="M12 6l4 4" />
+        </svg>
+      );
+    case "delete":
+      return (
+        <svg aria-hidden="true" viewBox="0 0 24 24">
+          <path {...common} d="M4 7h16" />
+          <path {...common} d="M9 7V4h6v3" />
+          <path {...common} d="M7 7l1 13h8l1-13" />
+          <path {...common} d="M10 11v5M14 11v5" />
+        </svg>
+      );
+    case "save":
+      return (
+        <svg aria-hidden="true" viewBox="0 0 24 24">
+          <path {...common} d="M5 4h11l3 3v13H5z" />
+          <path {...common} d="M8 4v6h8V4" />
+          <path {...common} d="M9 18h6" />
+        </svg>
+      );
+    case "cancel":
+    case "clear":
+      return (
+        <svg aria-hidden="true" viewBox="0 0 24 24">
+          <path {...common} d="M6 6l12 12M18 6L6 18" />
+        </svg>
+      );
+    case "attach":
+      return (
+        <svg aria-hidden="true" viewBox="0 0 24 24">
+          <path {...common} d="M8 12.5l6.4-6.4a3.5 3.5 0 1 1 5 5L10 20.5a5 5 0 0 1-7-7L12 4.5" />
+        </svg>
+      );
+    case "send":
+      return (
+        <svg aria-hidden="true" viewBox="0 0 24 24">
+          <path {...common} d="M4 20l16-8L4 4l3 8-3 8z" />
+          <path {...common} d="M7 12h13" />
+        </svg>
+      );
+    case "promote":
+      return (
+        <svg aria-hidden="true" viewBox="0 0 24 24">
+          <path {...common} d="M12 18V7" />
+          <path {...common} d="M8.5 10.5L12 7l3.5 3.5" />
+          <path {...common} d="M5 20h14" />
+        </svg>
+      );
+    case "demote":
+      return (
+        <svg aria-hidden="true" viewBox="0 0 24 24">
+          <path {...common} d="M12 6v11" />
+          <path {...common} d="M8.5 13.5L12 17l3.5-3.5" />
+          <path {...common} d="M5 20h14" />
+        </svg>
+      );
+    case "remove":
+      return (
+        <svg aria-hidden="true" viewBox="0 0 24 24">
+          <circle {...common} cx="9" cy="8" r="3" />
+          <path {...common} d="M4 19a5 5 0 0 1 10 0" />
+          <path {...common} d="M16 11h5" />
+        </svg>
+      );
+    case "ban":
+      return (
+        <svg aria-hidden="true" viewBox="0 0 24 24">
+          <circle {...common} cx="12" cy="12" r="8" />
+          <path {...common} d="M8.5 8.5l7 7" />
+        </svg>
+      );
+    case "unban":
+      return (
+        <svg aria-hidden="true" viewBox="0 0 24 24">
+          <circle {...common} cx="12" cy="12" r="8" />
+          <path {...common} d="M8.5 12h7" />
+        </svg>
+      );
+    case "invite":
+      return (
+        <svg aria-hidden="true" viewBox="0 0 24 24">
+          <circle {...common} cx="9" cy="8" r="3" />
+          <path {...common} d="M4 19a5 5 0 0 1 10 0" />
+          <path {...common} d="M18 8v6M15 11h6" />
+        </svg>
+      );
+    case "friend-remove":
+      return (
+        <svg aria-hidden="true" viewBox="0 0 24 24">
+          <circle {...common} cx="9" cy="8" r="3" />
+          <path {...common} d="M4 19a5 5 0 0 1 10 0" />
+          <path {...common} d="M16 8l4 4M20 8l-4 4" />
+        </svg>
+      );
+    case "peer-ban":
+      return (
+        <svg aria-hidden="true" viewBox="0 0 24 24">
+          <circle {...common} cx="9" cy="8" r="3" />
+          <path {...common} d="M4 19a5 5 0 0 1 10 0" />
+          <circle {...common} cx="18" cy="10" r="3" />
+          <path {...common} d="M16 8l4 4" />
+        </svg>
+      );
+    case "peer-unban":
+      return (
+        <svg aria-hidden="true" viewBox="0 0 24 24">
+          <circle {...common} cx="9" cy="8" r="3" />
+          <path {...common} d="M4 19a5 5 0 0 1 10 0" />
+          <path {...common} d="M15 10h6" />
+        </svg>
+      );
+  }
+}
+
+function IconButton(props: {
+  icon: IconName;
+  label: string;
+  onClick?: () => void;
+  type?: "button" | "submit";
+  disabled?: boolean;
+  variant?: "default" | "positive" | "danger";
+}) {
+  const variantClass =
+    props.variant === "positive" ? "positive" : props.variant === "danger" ? "danger" : "";
+
+  return (
+    <button
+      aria-label={props.label}
+      className={`icon-button ${variantClass}`.trim()}
+      disabled={props.disabled}
+      onClick={props.onClick}
+      title={props.label}
+      type={props.type ?? "button"}
+    >
+      <Icon name={props.icon} />
+      <span className="sr-only">{props.label}</span>
+    </button>
+  );
 }
 
 export default function App() {
@@ -666,6 +868,35 @@ export default function App() {
         incoming_friend_requests: current.incoming_friend_requests + 1,
       }));
       pushInfo(`New friend request from ${request.from_user.username}.`);
+      return;
+    }
+
+    if (type === "friend_request.updated") {
+      const request = payload.request as {
+        id: string;
+        status: "accepted" | "rejected" | "cancelled";
+        other_user: User;
+      };
+      refreshCurrentShellSilently();
+      if (request.status === "accepted") {
+        pushInfo(`${request.other_user.username} accepted the friend request.`);
+      } else if (request.status === "rejected") {
+        pushInfo(`${request.other_user.username} rejected the friend request.`);
+      }
+      return;
+    }
+
+    if (type === "dialog.summary.updated") {
+      const dialog = payload.dialog as DialogSummary;
+      const isCurrent = activeChatRef.current?.kind === "dialog" && activeChatRef.current.id === dialog.id;
+      const nextDialog = isCurrent ? { ...dialog, unread_count: 0 } : dialog;
+      setDialogs((current) => upsertDialog(current, nextDialog));
+      if (dialog.is_frozen) {
+        refreshCurrentShellSilently();
+      }
+      if (!isCurrent && dialog.last_message && dialog.last_message.sender_id !== currentUserId) {
+        pushInfo(`New message from ${dialog.other_user.username}.`);
+      }
       return;
     }
 
@@ -1394,7 +1625,7 @@ export default function App() {
                           <strong>{room.name}</strong>
                           <span>{room.member_count} members</span>
                         </div>
-                        <button className="mini-button" disabled={isJoined} onClick={() => void handleJoinRoom(room.id)}>
+                        <button className="mini-button positive" disabled={isJoined} onClick={() => void handleJoinRoom(room.id)}>
                           {isJoined ? "Joined" : "Join"}
                         </button>
                       </div>
@@ -1412,7 +1643,7 @@ export default function App() {
                           <span>{formatRelative(invitation.created_at)}</span>
                         </div>
                         <div className="inline-actions">
-                          <button className="mini-button" onClick={() => void handleAcceptInvitation(invitation.id)}>
+                          <button className="mini-button positive" onClick={() => void handleAcceptInvitation(invitation.id)}>
                             Accept
                           </button>
                           <button className="mini-button danger" onClick={() => void handleRejectInvitation(invitation.id)}>
@@ -1459,7 +1690,7 @@ export default function App() {
                           <strong>{friend.user.username}</strong>
                           <span>{friend.user.presence ?? "offline"}</span>
                         </div>
-                        <button className="mini-button" onClick={() => void handleOpenDialog(friend)}>
+                        <button className="mini-button positive" onClick={() => void handleOpenDialog(friend)}>
                           Open
                         </button>
                       </div>
@@ -1480,7 +1711,7 @@ export default function App() {
                         </div>
                         <div className="inline-actions">
                           <button
-                            className="mini-button"
+                            className="mini-button positive"
                             onClick={() => void runAction(() => acceptFriendRequest(request.id), refreshCurrentShellSilently)}
                           >
                             Accept
@@ -1512,9 +1743,7 @@ export default function App() {
                   </div>
                   <div className="conversation-actions">
                     {activeChat.kind === "room" ? (
-                      <button className="ghost-button" onClick={() => void handleLeaveRoom(activeChat.id)}>
-                        Leave Room
-                      </button>
+                      <IconButton icon="leave" label="Leave room" onClick={() => void handleLeaveRoom(activeChat.id)} />
                     ) : null}
                     {activeChat.kind === "dialog" && currentDialog?.is_frozen ? <span className="warning-chip">Messaging frozen</span> : null}
                   </div>
@@ -1563,18 +1792,16 @@ export default function App() {
                           <div className="edit-box">
                             <textarea value={editingText} onChange={(event) => setEditingText(event.target.value)} rows={3} />
                             <div className="inline-actions">
-                              <button className="mini-button" onClick={() => void handleSaveEdit(message.id)}>
-                                Save
-                              </button>
-                              <button
-                                className="mini-button danger"
+                              <IconButton icon="save" label="Save edit" onClick={() => void handleSaveEdit(message.id)} variant="positive" />
+                              <IconButton
+                                icon="cancel"
+                                label="Cancel edit"
                                 onClick={() => {
                                   setEditingMessageId(null);
                                   setEditingText("");
                                 }}
-                              >
-                                Cancel
-                              </button>
+                                variant="danger"
+                              />
                             </div>
                           </div>
                         ) : (
@@ -1582,34 +1809,61 @@ export default function App() {
                         )}
                         {message.attachments.length ? (
                           <div className="attachment-list">
-                            {message.attachments.map((attachment) => (
-                              <a href={toPublicUrl(attachment.download_url)} key={attachment.id} rel="noreferrer" target="_blank">
-                                {attachment.filename}
-                              </a>
-                            ))}
+                            {message.attachments.map((attachment) => {
+                              const attachmentUrl = toPublicUrl(attachment.download_url);
+                              const showImage = isImageAttachment(attachment.content_type);
+                              const showVideo = isVideoAttachment(attachment.content_type);
+
+                              return (
+                                <div className="attachment-card" key={attachment.id}>
+                                  {showImage ? (
+                                    <a
+                                      className="attachment-media-link"
+                                      href={attachmentUrl}
+                                      rel="noreferrer"
+                                      target="_blank"
+                                    >
+                                      <img
+                                        alt={attachment.filename}
+                                        className="attachment-media attachment-image"
+                                        loading="lazy"
+                                        src={attachmentUrl}
+                                      />
+                                    </a>
+                                  ) : null}
+                                  {showVideo ? (
+                                    <video className="attachment-media attachment-video" controls preload="metadata">
+                                      <source src={attachmentUrl} type={attachment.content_type} />
+                                      <a href={attachmentUrl} rel="noreferrer" target="_blank">
+                                        {attachment.filename}
+                                      </a>
+                                    </video>
+                                  ) : null}
+                                  <a className="attachment-link" href={attachmentUrl} rel="noreferrer" target="_blank">
+                                    {attachment.filename}
+                                  </a>
+                                </div>
+                              );
+                            })}
                           </div>
                         ) : null}
                         <footer>
                           <span>{message.is_edited ? "edited" : "posted"}</span>
                           <div className="inline-actions">
-                            <button className="mini-button" onClick={() => setReplyTarget(message)}>
-                              Reply
-                            </button>
+                            <IconButton icon="reply" label="Reply" onClick={() => setReplyTarget(message)} variant="positive" />
                             {isOwn ? (
-                              <button
-                                className="mini-button"
+                              <IconButton
+                                icon="edit"
+                                label="Edit message"
                                 onClick={() => {
                                   setEditingMessageId(message.id);
                                   setEditingText(message.text);
                                 }}
-                              >
-                                Edit
-                              </button>
+                                variant="positive"
+                              />
                             ) : null}
                             {canDelete ? (
-                              <button className="mini-button danger" onClick={() => void handleDeleteMessage(message.id)}>
-                                Delete
-                              </button>
+                              <IconButton icon="delete" label="Delete message" onClick={() => void handleDeleteMessage(message.id)} variant="danger" />
                             ) : null}
                           </div>
                         </footer>
@@ -1622,9 +1876,7 @@ export default function App() {
                   {replyTarget ? (
                     <div className="composer-banner">
                       Replying to {replyTarget.sender.username}: {replyTarget.text || "Attachment"}
-                      <button className="mini-button danger" onClick={() => setReplyTarget(null)} type="button">
-                        Clear
-                      </button>
+                      <IconButton icon="clear" label="Clear reply target" onClick={() => setReplyTarget(null)} variant="danger" />
                     </div>
                   ) : null}
                   {queuedAttachments.length ? (
@@ -1650,8 +1902,9 @@ export default function App() {
                     value={composerText}
                   />
                   <div className="composer-tools">
-                    <label className="file-label">
-                      <span>Attach</span>
+                    <label aria-label="Attach files" className="file-label icon-button" title="Attach files">
+                      <Icon name="attach" />
+                      <span className="sr-only">Attach files</span>
                       <input multiple onChange={handleFileSelection} type="file" />
                     </label>
                     <input
@@ -1659,13 +1912,13 @@ export default function App() {
                       placeholder="Attachment comment"
                       value={attachmentComment}
                     />
-                    <button
-                      className="primary-button"
+                    <IconButton
                       disabled={busy || (activeChat.kind === "dialog" && currentDialog?.is_frozen)}
+                      icon="send"
+                      label="Send message"
                       type="submit"
-                    >
-                      Send
-                    </button>
+                      variant="positive"
+                    />
                   </div>
                 </form>
               </>
@@ -1698,64 +1951,66 @@ export default function App() {
                   <div className="section-title">Members</div>
                   {activeRoomMembers.map((member) => (
                     <div className="list-card" key={member.user.id}>
-                      <div>
+                      <div className="list-card-content">
                         <strong>{member.user.username}</strong>
                         <span>
                           {member.role} · {member.user.presence ?? "offline"}
                         </span>
                       </div>
-                      {activeRoom.current_user_role === "owner" && member.role === "member" ? (
-                        <button
-                          className="mini-button"
-                          onClick={() =>
-                            void runAction(
-                              () => promoteRoomAdmin(activeRoom.id, member.user.id),
-                              () => refreshActiveRoomSilently(activeRoom.id),
-                            )
-                          }
-                        >
-                          Promote
-                        </button>
-                      ) : null}
-                      {activeRoom.current_user_role === "owner" && member.role === "admin" ? (
-                        <button
-                          className="mini-button danger"
-                          onClick={() =>
-                            void runAction(
-                              () => demoteRoomAdmin(activeRoom.id, member.user.id),
-                              () => refreshActiveRoomSilently(activeRoom.id),
-                            )
-                          }
-                        >
-                          Demote
-                        </button>
-                      ) : null}
-                      {["owner", "admin"].includes(activeRoom.current_user_role) && member.role !== "owner" ? (
-                        <div className="inline-actions">
-                          <button
-                            className="mini-button danger"
+                      <div className="list-card-actions">
+                        {activeRoom.current_user_role === "owner" && member.role === "member" ? (
+                          <IconButton
+                            icon="promote"
+                            label={`Promote ${member.user.username} to admin`}
                             onClick={() =>
                               void runAction(
-                                () => removeRoomMember(activeRoom.id, member.user.id),
+                                () => promoteRoomAdmin(activeRoom.id, member.user.id),
                                 () => refreshActiveRoomSilently(activeRoom.id),
                               )
                             }
-                          >
-                            Remove
-                          </button>
-                          <button
-                            className="mini-button danger"
+                            variant="positive"
+                          />
+                        ) : null}
+                        {activeRoom.current_user_role === "owner" && member.role === "admin" ? (
+                          <IconButton
+                            icon="demote"
+                            label={`Demote ${member.user.username} from admin`}
                             onClick={() =>
                               void runAction(
-                                () => banRoomUser(activeRoom.id, member.user.id),
+                                () => demoteRoomAdmin(activeRoom.id, member.user.id),
                                 () => refreshActiveRoomSilently(activeRoom.id),
                               )
                             }
-                          >
-                            Ban
-                          </button>
-                        </div>
-                      ) : null}
+                            variant="danger"
+                          />
+                        ) : null}
+                        {["owner", "admin"].includes(activeRoom.current_user_role) && member.role !== "owner" ? (
+                          <>
+                            <IconButton
+                              icon="remove"
+                              label={`Remove ${member.user.username} from room`}
+                              onClick={() =>
+                                void runAction(
+                                  () => removeRoomMember(activeRoom.id, member.user.id),
+                                  () => refreshActiveRoomSilently(activeRoom.id),
+                                )
+                              }
+                              variant="danger"
+                            />
+                            <IconButton
+                              icon="ban"
+                              label={`Ban ${member.user.username} from room`}
+                              onClick={() =>
+                                void runAction(
+                                  () => banRoomUser(activeRoom.id, member.user.id),
+                                  () => refreshActiveRoomSilently(activeRoom.id),
+                                )
+                              }
+                              variant="danger"
+                            />
+                          </>
+                        ) : null}
+                      </div>
                     </div>
                   ))}
                 </section>
@@ -1766,9 +2021,7 @@ export default function App() {
                       <div className="section-title">Invite User</div>
                       <form className="stack-form" onSubmit={handleInviteUser}>
                         <input value={inviteUsername} onChange={(event) => setInviteUsername(event.target.value)} placeholder="username" />
-                        <button className="primary-button" type="submit">
-                          Send Invite
-                        </button>
+                        <IconButton icon="invite" label="Send room invite" type="submit" variant="positive" />
                       </form>
                     </section>
 
@@ -1777,21 +2030,23 @@ export default function App() {
                       {activeRoomBans.length ? (
                         activeRoomBans.map((ban) => (
                           <div className="list-card" key={ban.user.id}>
-                            <div>
+                            <div className="list-card-content">
                               <strong>{ban.user.username}</strong>
                               <span>by {ban.banned_by.username}</span>
                             </div>
-                            <button
-                              className="mini-button"
-                              onClick={() =>
-                                void runAction(
-                                  () => unbanRoomUser(activeRoom.id, ban.user.id),
-                                  () => refreshActiveRoomSilently(activeRoom.id),
-                                )
-                              }
-                            >
-                              Unban
-                            </button>
+                            <div className="list-card-actions">
+                              <IconButton
+                                icon="unban"
+                                label={`Unban ${ban.user.username}`}
+                                onClick={() =>
+                                  void runAction(
+                                    () => unbanRoomUser(activeRoom.id, ban.user.id),
+                                    () => refreshActiveRoomSilently(activeRoom.id),
+                                  )
+                                }
+                                variant="positive"
+                              />
+                            </div>
                           </div>
                         ))
                       ) : (
@@ -1804,7 +2059,7 @@ export default function App() {
                       {activeRoomInvitations.length ? (
                         activeRoomInvitations.map((invitation) => (
                           <div className="list-card" key={invitation.id}>
-                            <div>
+                            <div className="list-card-content">
                               <strong>{invitation.user?.username ?? "Pending user"}</strong>
                               <span>{formatRelative(invitation.created_at)}</span>
                             </div>
@@ -1856,27 +2111,27 @@ export default function App() {
                   {activeFriend ? <p className="empty-copy">Friends since {formatTimestamp(activeFriend.friend_since)}</p> : <p className="empty-copy">Not in friends list.</p>}
                   <div className="inline-actions wrap">
                     {activeFriend ? (
-                      <button
-                        className="mini-button danger"
+                      <IconButton
+                        icon="friend-remove"
+                        label={`Remove ${currentDialog.other_user.username} from friends`}
                         onClick={() => void runAction(() => removeFriend(activeFriend.user.id), refreshCurrentShellSilently)}
-                      >
-                        Remove Friend
-                      </button>
+                        variant="danger"
+                      />
                     ) : null}
                     {activePeerBan ? (
-                      <button
-                        className="mini-button"
+                      <IconButton
+                        icon="peer-unban"
+                        label={`Remove peer ban for ${currentDialog.other_user.username}`}
                         onClick={() => void runAction(() => removePeerBan(activePeerBan.user.id), refreshCurrentShellSilently)}
-                      >
-                        Remove Peer Ban
-                      </button>
+                        variant="positive"
+                      />
                     ) : (
-                      <button
-                        className="mini-button danger"
+                      <IconButton
+                        icon="peer-ban"
+                        label={`Create peer ban for ${currentDialog.other_user.username}`}
                         onClick={() => void runAction(() => createPeerBan(currentDialog.other_user.id), refreshCurrentShellSilently)}
-                      >
-                        Create Peer Ban
-                      </button>
+                        variant="danger"
+                      />
                     )}
                   </div>
                 </section>
@@ -1954,7 +2209,7 @@ export default function App() {
                     <span>{formatRelative(ban.created_at)}</span>
                   </div>
                   <button
-                    className="mini-button"
+                    className="mini-button positive"
                     onClick={() => void runAction(() => removePeerBan(ban.user.id), refreshCurrentShellSilently)}
                   >
                     Remove

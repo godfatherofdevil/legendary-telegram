@@ -28,6 +28,7 @@ class SocialValidationError(Exception):
 
 @dataclass(frozen=True)
 class FriendshipResult:
+    request: FriendRequest | None
     friend: User
     created_at: object
 
@@ -40,13 +41,20 @@ def _canonical_user_pair(user_a: User, user_b: User) -> tuple[User, User]:
     return user_b, user_a
 
 
-def _freeze_dialog_for_pair(*, user_a: User, user_b: User, reason: str) -> None:
+def _freeze_dialog_for_pair(*, user_a: User, user_b: User, reason: str) -> Dialog | None:
     user_low, user_high = _canonical_user_pair(user_a, user_b)
-    Dialog.objects.filter(user_low=user_low, user_high=user_high).update(
-        is_frozen=True,
-        frozen_reason=reason,
-        updated_at=timezone.now(),
+    dialog = (
+        Dialog.objects.select_related("user_low", "user_high")
+        .filter(user_low=user_low, user_high=user_high)
+        .first()
     )
+    if dialog is None:
+        return None
+    dialog.is_frozen = True
+    dialog.frozen_reason = reason
+    dialog.updated_at = timezone.now()
+    dialog.save(update_fields=["is_frozen", "frozen_reason", "updated_at"])
+    return dialog
 
 
 def _refresh_dialog_state_for_pair(*, user_a: User, user_b: User) -> None:
@@ -72,7 +80,13 @@ def list_friends(*, user: User) -> list[FriendshipResult]:
     results: list[FriendshipResult] = []
     for friendship in friendships:
         friend = friendship.user_high if friendship.user_low_id == user.id else friendship.user_low
-        results.append(FriendshipResult(friend=friend, created_at=friendship.created_at))
+        results.append(
+            FriendshipResult(
+                request=None,
+                friend=friend,
+                created_at=friendship.created_at,
+            )
+        )
     return results
 
 
@@ -152,11 +166,15 @@ def accept_friend_request(*, request_id, actor: User) -> FriendshipResult:
     friend_request.responded_at = timezone.now()
     friend_request.save(update_fields=["status", "responded_at", "updated_at"])
     _refresh_dialog_state_for_pair(user_a=friend_request.from_user, user_b=friend_request.to_user)
-    return FriendshipResult(friend=friend_request.from_user, created_at=friendship.created_at)
+    return FriendshipResult(
+        request=friend_request,
+        friend=friend_request.from_user,
+        created_at=friendship.created_at,
+    )
 
 
 @transaction.atomic
-def reject_friend_request(*, request_id, actor: User) -> None:
+def reject_friend_request(*, request_id, actor: User) -> FriendRequest:
     friend_request = get_object_or_404(
         FriendRequest.objects.select_for_update(),
         id=request_id,
@@ -168,10 +186,11 @@ def reject_friend_request(*, request_id, actor: User) -> None:
     friend_request.status = FriendRequestStatus.REJECTED
     friend_request.responded_at = timezone.now()
     friend_request.save(update_fields=["status", "responded_at", "updated_at"])
+    return friend_request
 
 
 @transaction.atomic
-def remove_friend(*, actor: User, other_user_id) -> None:
+def remove_friend(*, actor: User, other_user_id) -> Dialog | None:
     other_user = get_object_or_404(User, id=other_user_id)
     user_low, user_high = _canonical_user_pair(actor, other_user)
     deleted_count, _details = Friendship.objects.filter(
@@ -180,7 +199,11 @@ def remove_friend(*, actor: User, other_user_id) -> None:
     ).delete()
     if deleted_count == 0:
         raise Friendship.DoesNotExist
-    _freeze_dialog_for_pair(user_a=actor, user_b=other_user, reason="friendship_required")
+    return _freeze_dialog_for_pair(
+        user_a=actor,
+        user_b=other_user,
+        reason="friendship_required",
+    )
 
 
 @transaction.atomic

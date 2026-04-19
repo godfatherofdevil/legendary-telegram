@@ -118,6 +118,67 @@ def test_websocket_requires_authenticated_session() -> None:
 
 
 @pytest.mark.django_db(transaction=True)
+def test_remove_friend_pushes_frozen_dialog_summary_to_both_users() -> None:
+    alice = create_user(email="alice-remove-ws@example.com", username="alice-remove-ws")
+    bob = create_user(email="bob-remove-ws@example.com", username="bob-remove-ws")
+    make_friends(alice, bob)
+    user_low, user_high = sorted([alice, bob], key=lambda user: str(user.id))
+    dialog = Dialog.objects.create(user_low=user_low, user_high=user_high)
+
+    async def scenario():
+        alice_ws = await connect_user(alice)
+        bob_ws = await connect_user(bob)
+        await drain_events(alice_ws)
+        await drain_events(bob_ws)
+
+        client = Client()
+        client.force_login(alice)
+        response = client.delete(reverse("friend-detail", kwargs={"user_id": bob.id}))
+        assert response.status_code == 204
+
+        alice_event = await next_event(alice_ws, skip_types=("presence.updated",))
+        bob_event = await next_event(bob_ws, skip_types=("presence.updated",))
+
+        assert alice_event == {
+            "type": "dialog.summary.updated",
+            "payload": {
+                "dialog": {
+                    "id": str(dialog.id),
+                    "other_user": {
+                        "id": str(bob.id),
+                        "username": bob.username,
+                        "presence": "online",
+                    },
+                    "unread_count": 0,
+                    "is_frozen": True,
+                    "last_message": None,
+                }
+            },
+        }
+        assert bob_event == {
+            "type": "dialog.summary.updated",
+            "payload": {
+                "dialog": {
+                    "id": str(dialog.id),
+                    "other_user": {
+                        "id": str(alice.id),
+                        "username": alice.username,
+                        "presence": "online",
+                    },
+                    "unread_count": 0,
+                    "is_frozen": True,
+                    "last_message": None,
+                }
+            },
+        }
+
+        await alice_ws.disconnect()
+        await bob_ws.disconnect()
+
+    async_to_sync(scenario)()
+
+
+@pytest.mark.django_db(transaction=True)
 def test_websocket_ping_and_validation_errors() -> None:
     user = create_user(email="alice@example.com", username="alice")
 
@@ -276,8 +337,8 @@ def test_dialog_websocket_send_edit_delete_and_read_flows() -> None:
             "payload": {"accepted": True},
             "request_id": "req-edit",
         }
-        assert (await next_event(alice_ws))["type"] == "dialog.message.updated"
-        updated_for_bob = await next_event(bob_ws)
+        assert (await next_event(alice_ws, skip_types=("dialog.summary.updated",)))["type"] == "dialog.message.updated"
+        updated_for_bob = await next_event(bob_ws, skip_types=("dialog.summary.updated",))
         assert updated_for_bob["type"] == "dialog.message.updated"
         assert updated_for_bob["payload"]["message"]["text"] == "updated dm"
 
@@ -301,7 +362,7 @@ def test_dialog_websocket_send_edit_delete_and_read_flows() -> None:
                 "unread_count": 0,
             },
         }
-        read_updated = await next_event(alice_ws)
+        read_updated = await next_event(alice_ws, skip_types=("dialog.summary.updated",))
         assert read_updated == {
             "type": "dialog.read.updated",
             "payload": {
@@ -326,8 +387,8 @@ def test_dialog_websocket_send_edit_delete_and_read_flows() -> None:
             "payload": {"accepted": True},
             "request_id": "req-delete",
         }
-        assert (await next_event(alice_ws))["type"] == "dialog.message.deleted"
-        deleted_for_bob = await next_event(bob_ws)
+        assert (await next_event(alice_ws, skip_types=("dialog.summary.updated",)))["type"] == "dialog.message.deleted"
+        deleted_for_bob = await next_event(bob_ws, skip_types=("dialog.summary.updated",))
         assert deleted_for_bob == {
             "type": "dialog.message.deleted",
             "payload": {
@@ -397,7 +458,7 @@ def test_presence_heartbeat_broadcasts_presence_updates() -> None:
 
 
 @pytest.mark.django_db(transaction=True)
-def test_rest_notifications_and_room_access_revocation_are_sent_over_websocket() -> None:
+def test_rest_notifications_dialog_updates_and_room_access_revocation_are_sent_over_websocket() -> None:
     sender = create_user(email="sender@example.com", username="sender")
     recipient = create_user(email="recipient@example.com", username="recipient")
     owner = create_user(email="owner@example.com", username="owner")
@@ -411,7 +472,9 @@ def test_rest_notifications_and_room_access_revocation_are_sent_over_websocket()
     )
 
     async def scenario():
+        sender_ws = await connect_user(sender)
         recipient_ws = await connect_user(recipient)
+        await drain_events(sender_ws)
 
         await recipient_ws.send_json_to(
             {
@@ -432,9 +495,111 @@ def test_rest_notifications_and_room_access_revocation_are_sent_over_websocket()
             payload={"username": recipient.username, "message": "Let's connect"},
         )
         assert friend_request_response.status_code == 201
+        friend_request_id = friend_request_response.json()["data"]["friend_request"]["id"]
         friend_request_event = await next_event(recipient_ws)
         assert friend_request_event["type"] == "friend_request.created"
         assert friend_request_event["payload"]["request"]["from_user"]["username"] == sender.username
+
+        accept_response = post_json_as(
+            user=recipient,
+            url=reverse("friend-request-accept", kwargs={"request_id": friend_request_id}),
+            payload={},
+        )
+        assert accept_response.status_code == 200
+        sender_request_update = await next_event(sender_ws, skip_types=("presence.updated",))
+        assert sender_request_update["type"] == "friend_request.updated"
+        assert sender_request_update["payload"]["request"]["id"] == friend_request_id
+        assert sender_request_update["payload"]["request"]["status"] == "accepted"
+        assert sender_request_update["payload"]["request"]["other_user"] == {
+            "id": str(recipient.id),
+            "username": recipient.username,
+        }
+        assert sender_request_update["payload"]["request"]["responded_at"] is not None
+        recipient_request_update = await next_event(recipient_ws)
+        assert recipient_request_update["type"] == "friend_request.updated"
+        assert recipient_request_update["payload"]["request"]["status"] == "accepted"
+
+        dialog_response = post_json_as(
+            user=recipient,
+            url=reverse("dialog-list-create"),
+            payload={"user_id": str(sender.id)},
+        )
+        assert dialog_response.status_code == 200
+        dialog_id = dialog_response.json()["data"]["dialog"]["id"]
+
+        sender_dialog_summary = await next_event(sender_ws)
+        assert sender_dialog_summary == {
+            "type": "dialog.summary.updated",
+            "payload": {
+                "dialog": {
+                    "id": dialog_id,
+                    "other_user": {
+                        "id": str(recipient.id),
+                        "username": recipient.username,
+                        "presence": "online",
+                    },
+                    "unread_count": 0,
+                    "is_frozen": False,
+                    "last_message": None,
+                }
+            },
+        }
+        recipient_dialog_summary = await next_event(recipient_ws)
+        assert recipient_dialog_summary["type"] == "dialog.summary.updated"
+        assert recipient_dialog_summary["payload"]["dialog"]["id"] == dialog_id
+        assert recipient_dialog_summary["payload"]["dialog"]["last_message"] is None
+
+        dialog_message_response = post_json_as(
+            user=recipient,
+            url=reverse("dialog-message-list-create", kwargs={"dialog_id": dialog_id}),
+            payload={"text": "hello from recipient"},
+        )
+        assert dialog_message_response.status_code == 201
+
+        sender_message_summary = await next_event(sender_ws)
+        assert sender_message_summary == {
+            "type": "dialog.summary.updated",
+            "payload": {
+                "dialog": {
+                    "id": dialog_id,
+                    "other_user": {
+                        "id": str(recipient.id),
+                        "username": recipient.username,
+                        "presence": "online",
+                    },
+                    "unread_count": 1,
+                    "is_frozen": False,
+                    "last_message": {
+                        "id": dialog_message_response.json()["data"]["message"]["id"],
+                        "sender_id": str(recipient.id),
+                        "text": "hello from recipient",
+                        "created_at": dialog_message_response.json()["data"]["message"]["created_at"],
+                    },
+                }
+            },
+        }
+        recipient_message_summary = await next_event(recipient_ws)
+        assert recipient_message_summary == {
+            "type": "dialog.summary.updated",
+            "payload": {
+                "dialog": {
+                    "id": dialog_id,
+                    "other_user": {
+                        "id": str(sender.id),
+                        "username": sender.username,
+                        "presence": "online",
+                    },
+                    "unread_count": 0,
+                    "is_frozen": False,
+                    "last_message": {
+                        "id": dialog_message_response.json()["data"]["message"]["id"],
+                        "sender_id": str(recipient.id),
+                        "text": "hello from recipient",
+                        "created_at": dialog_message_response.json()["data"]["message"]["created_at"],
+                    },
+                }
+            },
+        }
 
         invitation_response = post_json_as(
             user=owner,
@@ -482,6 +647,7 @@ def test_rest_notifications_and_room_access_revocation_are_sent_over_websocket()
         post_removal_events = await drain_events(recipient_ws)
         assert all(event["type"] != "room.message.created" for event in post_removal_events)
 
+        await sender_ws.disconnect()
         await recipient_ws.disconnect()
 
     async_to_sync(scenario)()

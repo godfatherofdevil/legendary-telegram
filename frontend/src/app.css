@@ -123,18 +123,29 @@ textarea {
 .auth-tabs button,
 .ghost-button,
 .mini-button,
+.icon-button,
 .danger-button,
 .primary-button {
-  border: none;
+  border: 1px solid transparent;
   border-radius: 999px;
   padding: 0.8rem 1rem;
-  transition: transform 120ms ease, background 120ms ease;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+  box-shadow: 0 10px 24px rgba(148, 163, 184, 0.14);
+  transition:
+    transform 140ms ease,
+    background 140ms ease,
+    box-shadow 140ms ease,
+    border-color 140ms ease,
+    color 140ms ease;
 }
 
 .auth-tabs button,
 .ghost-button,
-.mini-button {
-  background: rgba(255, 255, 255, 0.72);
+.mini-button,
+.icon-button {
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.94), rgba(248, 250, 252, 0.84));
+  border-color: rgba(148, 163, 184, 0.22);
   color: #1f2937;
 }
 
@@ -146,9 +157,63 @@ textarea {
 }
 
 .danger-button,
-.mini-button.danger {
-  background: rgba(185, 28, 28, 0.12);
+.mini-button.danger,
+.icon-button.danger {
+  background: linear-gradient(135deg, rgba(254, 226, 226, 0.92), rgba(254, 242, 242, 0.98));
+  border-color: rgba(220, 38, 38, 0.18);
+  box-shadow: 0 12px 28px rgba(239, 68, 68, 0.16);
   color: var(--danger);
+}
+
+.mini-button.positive,
+.icon-button.positive {
+  background: linear-gradient(135deg, #0f766e, #0f9f8f);
+  border-color: rgba(15, 118, 110, 0.28);
+  box-shadow: 0 14px 30px rgba(15, 118, 110, 0.24);
+  color: white;
+}
+
+button:hover:not(:disabled) {
+  transform: translateY(-1px);
+}
+
+button:active:not(:disabled) {
+  transform: translateY(0);
+  box-shadow: 0 8px 18px rgba(148, 163, 184, 0.16);
+}
+
+button:focus-visible {
+  outline: 3px solid rgba(14, 165, 233, 0.22);
+  outline-offset: 2px;
+}
+
+button:disabled {
+  cursor: not-allowed;
+  opacity: 0.56;
+  box-shadow: none;
+}
+
+.ghost-button:hover:not(:disabled),
+.mini-button:hover:not(:disabled),
+.icon-button:hover:not(:disabled),
+.auth-tabs button:hover:not(:disabled) {
+  border-color: rgba(15, 118, 110, 0.18);
+  box-shadow: 0 14px 30px rgba(148, 163, 184, 0.2);
+}
+
+.mini-button.positive:hover:not(:disabled),
+.icon-button.positive:hover:not(:disabled),
+.primary-button:hover:not(:disabled),
+.auth-tabs button.is-active:hover:not(:disabled),
+.sidebar-header button.is-active:hover:not(:disabled) {
+  box-shadow: 0 18px 34px rgba(15, 118, 110, 0.28);
+}
+
+.danger-button:hover:not(:disabled),
+.mini-button.danger:hover:not(:disabled),
+.icon-button.danger:hover:not(:disabled) {
+  border-color: rgba(220, 38, 38, 0.24);
+  box-shadow: 0 16px 32px rgba(239, 68, 68, 0.2);
 }
 
 .auth-form,
@@ -263,7 +328,8 @@ textarea {
   display: flex;
   justify-content: space-between;
   gap: 0.8rem;
-  align-items: center;
+  align-items: flex-start;
+  flex-wrap: wrap;
   width: 100%;
   padding: 0.95rem 1rem;
   border-radius: 18px;
@@ -273,6 +339,26 @@ textarea {
 
 .list-item {
   text-align: left;
+}
+
+.list-card-content {
+  flex: 1 1 12rem;
+  min-width: 0;
+}
+
+.list-card-content strong,
+.detail-grid strong {
+  display: block;
+  overflow-wrap: anywhere;
+}
+
+.list-card-actions {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  align-items: center;
+  margin-left: auto;
 }
 
 .list-item.is-selected {
@@ -355,6 +441,7 @@ textarea {
   justify-content: space-between;
   gap: 0.75rem;
   align-items: center;
+  flex-wrap: wrap;
   color: var(--text-muted);
   font-size: 0.88rem;
 }
@@ -382,9 +469,14 @@ textarea {
 }
 
 .queued-chip button {
-  border: none;
-  background: transparent;
+  width: 1.5rem;
+  height: 1.5rem;
+  padding: 0;
+  border-radius: 999px;
+  border: 1px solid rgba(146, 64, 14, 0.16);
+  background: rgba(255, 255, 255, 0.7);
   color: inherit;
+  box-shadow: none;
 }
 
 .attachment-list {
@@ -393,7 +485,33 @@ textarea {
   gap: 0.5rem;
 }
 
-.attachment-list a {
+.attachment-card {
+  display: grid;
+  gap: 0.45rem;
+  max-width: min(100%, 24rem);
+}
+
+.attachment-media-link {
+  display: block;
+}
+
+.attachment-media {
+  display: block;
+  width: 100%;
+  max-width: min(100%, 24rem);
+  max-height: min(18rem, 40vh);
+  border-radius: 18px;
+  border: 1px solid rgba(148, 163, 184, 0.2);
+  background: rgba(15, 23, 42, 0.06);
+}
+
+.attachment-image,
+.attachment-video {
+  object-fit: contain;
+}
+
+.attachment-link {
+  width: fit-content;
   padding: 0.45rem 0.7rem;
   border-radius: 999px;
   background: rgba(14, 165, 233, 0.12);
@@ -412,14 +530,7 @@ textarea {
 }
 
 .file-label {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  min-width: 110px;
-  padding: 0.8rem 1rem;
-  border-radius: 999px;
-  background: rgba(255, 255, 255, 0.72);
-  border: 1px solid var(--border);
+  min-width: 3rem;
   overflow: hidden;
   position: relative;
 }
@@ -439,6 +550,57 @@ textarea {
 
 .detail-grid span {
   color: var(--text-muted);
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.panel-card {
+  min-width: 0;
+  overflow: hidden;
+}
+
+.context-panel .panel-card,
+.context-panel .list-card,
+.conversation-actions,
+.composer-banner,
+.inline-actions,
+.composer-tools {
+  min-width: 0;
+}
+
+.conversation-actions,
+.inline-actions,
+.composer-banner,
+.composer-tools {
+  flex-wrap: wrap;
+}
+
+.icon-button {
+  width: 2.75rem;
+  min-width: 2.75rem;
+  height: 2.75rem;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+}
+
+.icon-button svg {
+  width: 1.1rem;
+  height: 1.1rem;
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
 }
 
 .danger-card {
@@ -540,6 +702,10 @@ textarea {
   .sidebar,
   .conversation {
     min-height: auto;
+  }
+
+  .detail-grid {
+    grid-template-columns: 1fr;
   }
 }
 

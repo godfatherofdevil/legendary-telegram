@@ -2834,7 +2834,67 @@ Dialog example:
 
 ---
 
-### 18.4.13 Room Membership Updated
+### 18.4.13 Friend Request Updated
+
+```json
+{
+  "type": "friend_request.updated",
+  "payload": {
+    "request": {
+      "id": "fr_01",
+      "status": "accepted",
+      "other_user": {
+        "id": "usr_02",
+        "username": "bob"
+      },
+      "responded_at": "2026-04-18T11:32:00Z"
+    }
+  }
+}
+```
+
+### Rules
+
+* MUST be sent to both involved users when a pending friend request is accepted or rejected
+* MUST reflect the persisted final status
+
+---
+
+### 18.4.14 Dialog Summary Updated
+
+```json
+{
+  "type": "dialog.summary.updated",
+  "payload": {
+    "dialog": {
+      "id": "dlg_01",
+      "other_user": {
+        "id": "usr_02",
+        "username": "bob",
+        "presence": "online"
+      },
+      "unread_count": 1,
+      "is_frozen": false,
+      "last_message": {
+        "id": "msg_401",
+        "sender_id": "usr_02",
+        "text": "Hi Alice",
+        "created_at": "2026-04-18T11:25:00Z"
+      }
+    }
+  }
+}
+```
+
+### Rules
+
+* MUST be sent to both dialog participants when a dialog is first created
+* MUST be sent to both dialog participants after dialog message creation so non-subscribed clients can update sidebar state without a full reload
+* MUST expose the unread count from the perspective of the receiving user
+
+---
+
+### 18.4.15 Room Membership Updated
 
 User removed or joined:
 
