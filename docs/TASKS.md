@@ -698,6 +698,89 @@ Create service logic for room message lifecycle.
 
 ---
 
+### T6.5 Introduce object-storage abstraction for attachments
+**Status:** DONE
+
+#### Objective
+Prepare attachment storage for migration away from direct Django filesystem operations without changing the public API contract.
+
+#### Requirements
+- MUST preserve all existing attachment API fields and authorization semantics
+- MUST keep `attachments.storage_key` as the canonical internal object identifier unless a higher-precedence schema change requires otherwise
+- MUST replace direct path-centric attachment operations with an explicit storage service boundary
+- MUST use the AWS `boto3` Python client for object operations against an S3-compatible backend
+- MUST make the storage backend configurable by environment so local migration rollout can be validated safely
+
+#### Deliverables
+- attachment storage service interface for upload, stream/read, existence check, and delete
+- MinIO-compatible implementation using `boto3`
+- migration notes covering fallback, rollback, and cutover expectations
+
+#### Acceptance Criteria
+- attachment application code no longer depends directly on local filesystem paths in core business flows
+- the API contract for upload, metadata, download, and deletion remains unchanged
+
+#### Tests
+- unit tests for object-storage service behavior
+- contract-preservation tests for attachment API flows
+
+---
+
+### T6.6 Migrate attachment read/write/delete flows to MinIO-backed storage
+**Status:** DONE
+
+#### Objective
+Move attachment binary persistence from local filesystem storage to MinIO while preserving contract-visible behavior.
+
+#### Requirements
+- MUST store all new attachment objects in bucket `uploads`
+- MUST use `boto3` against the MinIO endpoint for upload, download, and delete operations
+- MUST preserve original filename, size validation, and access-control rules
+- MUST ensure room deletion and message-driven attachment deletion remove the corresponding MinIO object
+- MUST ensure room access loss revokes attachment download immediately
+
+#### Acceptance Criteria
+- new uploads are persisted in MinIO rather than the backend container filesystem
+- authorized downloads still work through the documented API endpoints
+- deletion paths remove both metadata and object storage state
+
+#### Tests
+- upload success against MinIO-backed storage
+- authorized download success against MinIO-backed storage
+- unauthorized download rejection remains unchanged
+- room deletion removes corresponding MinIO objects
+
+---
+
+### T6.7 Backfill existing filesystem attachments into MinIO
+**Status:** DONE
+
+#### Objective
+Provide a deterministic migration path for attachments that already exist on local filesystem storage.
+
+#### Requirements
+- MUST enumerate existing attachment records and associated filesystem objects
+- MUST copy existing blobs into MinIO bucket `uploads` using stable object keys
+- MUST verify copied object size and presence before considering an item migrated
+- MUST define behavior for missing filesystem blobs and partially migrated states
+- MUST provide an idempotent migration command or job
+
+#### Deliverables
+- migration command or operational script
+- verification/reporting output for migrated, skipped, and failed objects
+- rollback notes for incomplete runs
+
+#### Acceptance Criteria
+- repeated migration runs do not duplicate or corrupt already migrated objects
+- attachment metadata remains consistent with migrated object keys
+
+#### Tests
+- idempotent backfill test
+- partial-failure handling test
+- post-backfill attachment download smoke test
+
+---
+
 ## M7. Presence and Unread State
 
 ### T7.1 Implement presence domain logic
@@ -1122,6 +1205,72 @@ Create service logic for room message lifecycle.
 
 #### Tests
 - end-to-end smoke validation
+
+---
+
+### T11.4 Add MinIO to Docker Compose topology
+**Status:** DONE
+
+#### Objective
+Extend local deployment so object storage runs as a first-class service.
+
+#### Requirements
+- MUST add a dedicated `minio` service to Docker Compose
+- MinIO MUST run separately from `backend`, `postgres`, `redis`, and `frontend`
+- MUST use a persistent Docker volume for MinIO data
+- MUST document required MinIO environment variables and local defaults
+
+#### Acceptance Criteria
+- `docker compose up` starts MinIO successfully alongside the rest of the stack
+- MinIO data persists across container recreation
+
+#### Tests
+- compose startup smoke test including MinIO health
+- persistence smoke test across MinIO restart
+
+---
+
+### T11.5 Bootstrap the `uploads` bucket during deployment
+**Status:** DONE
+
+#### Objective
+Ensure local deployment always provisions the required attachment bucket automatically.
+
+#### Requirements
+- deployment MUST create bucket `uploads` if it does not already exist
+- bucket bootstrap MUST be safe to run repeatedly
+- bootstrap MUST complete before backend attachment flows depend on the bucket
+- bootstrap MAY use a dedicated one-shot init container or equivalent deterministic startup step
+
+#### Acceptance Criteria
+- a fresh local deployment results in an available `uploads` bucket without manual steps
+- repeated deployments do not fail when the bucket already exists
+
+#### Tests
+- fresh-environment bucket creation smoke test
+- idempotent re-run smoke test
+
+---
+
+### T11.6 Replace local media-root readiness checks with object-storage validation
+**Status:** DONE
+
+#### Objective
+Align backend and deployment readiness with the MinIO-backed attachment design.
+
+#### Requirements
+- MUST stop treating local media directory existence as the primary attachment readiness signal
+- readiness MUST verify MinIO connectivity and required bucket availability
+- health output SHOULD clearly indicate object-storage status for debugging
+- docs MUST be updated to remove outdated local-filesystem-only readiness assumptions
+
+#### Acceptance Criteria
+- backend readiness fails when MinIO is unavailable or bucket `uploads` is missing
+- backend readiness succeeds when object storage is healthy
+
+#### Tests
+- readiness failure test when MinIO is unreachable
+- readiness success test when MinIO and `uploads` are available
 
 ---
 

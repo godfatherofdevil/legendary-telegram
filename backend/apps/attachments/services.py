@@ -3,13 +3,13 @@ import os
 import uuid
 from pathlib import Path
 
-from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.core.files.uploadedfile import UploadedFile
 from django.db import transaction
 
 from apps.accounts.serializers import serialize_public_user
 from apps.attachments.models import Attachment, DialogMessageAttachment, RoomMessageAttachment
+from apps.attachments.storage import delete_attachment_from_storage, get_attachment_storage
 from apps.chat.models import RoomBan, RoomMembership
 from apps.common.enums import AttachmentBindingType
 
@@ -27,29 +27,8 @@ class AttachmentValidationError(Exception):
     pass
 
 
-def attachment_storage_root() -> Path:
-    return Path(settings.MEDIA_ROOT) / settings.ATTACHMENTS_STORAGE_DIR
-
-
-def attachment_absolute_path(storage_key: str) -> Path:
-    return attachment_storage_root() / storage_key
-
-
 def delete_attachment_file(*, storage_key: str) -> None:
-    path = attachment_absolute_path(storage_key)
-    try:
-        path.unlink(missing_ok=True)
-    except OSError:
-        return
-
-    parent = path.parent
-    root = attachment_storage_root()
-    while parent != root and parent.exists():
-        try:
-            parent.rmdir()
-        except OSError:
-            break
-        parent = parent.parent
+    delete_attachment_from_storage(storage_key=storage_key)
 
 
 def _guess_content_type(uploaded_file: UploadedFile) -> str:
@@ -76,14 +55,6 @@ def _build_storage_key(original_filename: str) -> str:
     suffix = Path(original_filename).suffix
     token = uuid.uuid4().hex
     return f"{token[:2]}/{token}{suffix}"
-
-
-def _write_uploaded_file(*, uploaded_file: UploadedFile, storage_key: str) -> None:
-    path = attachment_absolute_path(storage_key)
-    path.parent.mkdir(parents=True, exist_ok=True)
-    with path.open("wb") as destination:
-        for chunk in uploaded_file.chunks():
-            destination.write(chunk)
 
 
 def _serialize_attachment_base(attachment: Attachment) -> dict:
@@ -154,20 +125,33 @@ def create_attachment(
     *, uploaded_by_user: User, uploaded_file: UploadedFile, comment: str | None
 ) -> Attachment:
     size_bytes, content_type = _validate_uploaded_file(uploaded_file)
-    storage_key = _build_storage_key(uploaded_file.name)
-    attachment = Attachment.objects.create(
-        uploaded_by_user=uploaded_by_user,
-        storage_key=storage_key,
-        original_filename=os.path.basename(uploaded_file.name),
-        content_type=content_type,
-        size_bytes=size_bytes,
-        comment=comment,
-    )
+    original_filename = os.path.basename(uploaded_file.name)
+    storage_key = _build_storage_key(original_filename)
+    storage = get_attachment_storage()
+
     try:
-        _write_uploaded_file(uploaded_file=uploaded_file, storage_key=storage_key)
+        storage.put_uploaded_file(
+            storage_key=storage_key,
+            uploaded_file=uploaded_file,
+            content_type=content_type,
+            original_filename=original_filename,
+        )
     except Exception:
-        attachment.delete()
         raise
+
+    try:
+        attachment = Attachment.objects.create(
+            uploaded_by_user=uploaded_by_user,
+            storage_key=storage_key,
+            original_filename=original_filename,
+            content_type=content_type,
+            size_bytes=size_bytes,
+            comment=comment,
+        )
+    except Exception:
+        storage.delete(storage_key=storage_key)
+        raise
+
     return attachment
 
 

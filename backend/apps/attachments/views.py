@@ -8,13 +8,13 @@ from apps.attachments.serializers import AttachmentUploadSerializer
 from apps.attachments.services import (
     AttachmentConflictError,
     AttachmentValidationError,
-    attachment_absolute_path,
     create_attachment,
     delete_unbound_attachment,
     require_attachment_access,
     serialize_attachment_created,
     serialize_attachment_metadata,
 )
+from apps.attachments.storage import AttachmentObjectNotFoundError, open_attachment_for_download
 from apps.common.api import error_response, success_response
 
 
@@ -106,15 +106,16 @@ class AttachmentDownloadView(APIView):
                 message="The requested resource was not found.",
                 status_code=status.HTTP_404_NOT_FOUND,
             )
-        path = attachment_absolute_path(attachment.storage_key)
-        if not path.exists():
+        try:
+            file_handle = open_attachment_for_download(storage_key=attachment.storage_key)
+        except AttachmentObjectNotFoundError:
             return error_response(
                 code="not_found",
                 message="The requested resource was not found.",
                 status_code=status.HTTP_404_NOT_FOUND,
             )
         response = FileResponse(
-            path.open("rb"),
+            file_handle,
             as_attachment=True,
             filename=attachment.original_filename,
             content_type=attachment.content_type,

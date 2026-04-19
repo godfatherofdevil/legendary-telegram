@@ -89,6 +89,54 @@ def test_run_startup_migrations_does_not_hide_other_inconsistencies(monkeypatch)
         startup.run_startup_migrations()
 
 
+def test_run_attachment_storage_backfill_on_startup_is_disabled_by_default(monkeypatch) -> None:
+    calls: list[tuple[str, dict]] = []
+
+    monkeypatch.delenv("ATTACHMENTS_RUN_BACKFILL_ON_STARTUP", raising=False)
+    monkeypatch.setattr(startup.settings, "ATTACHMENTS_STORAGE_BACKEND", "s3")
+    monkeypatch.setattr(
+        startup,
+        "call_command",
+        lambda name, **kwargs: calls.append((name, kwargs)),
+    )
+
+    startup.run_attachment_storage_backfill_on_startup()
+
+    assert calls == []
+
+
+def test_run_attachment_storage_backfill_on_startup_runs_when_flag_enabled(monkeypatch) -> None:
+    calls: list[tuple[str, dict]] = []
+
+    monkeypatch.setenv("ATTACHMENTS_RUN_BACKFILL_ON_STARTUP", "1")
+    monkeypatch.setattr(startup.settings, "ATTACHMENTS_STORAGE_BACKEND", "s3")
+    monkeypatch.setattr(
+        startup,
+        "call_command",
+        lambda name, **kwargs: calls.append((name, kwargs)),
+    )
+
+    startup.run_attachment_storage_backfill_on_startup()
+
+    assert calls == [("backfill_attachments_to_object_storage", {"verbosity": 1})]
+
+
+def test_run_attachment_storage_backfill_on_startup_skips_non_s3_backend(monkeypatch) -> None:
+    calls: list[tuple[str, dict]] = []
+
+    monkeypatch.setenv("ATTACHMENTS_RUN_BACKFILL_ON_STARTUP", "1")
+    monkeypatch.setattr(startup.settings, "ATTACHMENTS_STORAGE_BACKEND", "filesystem")
+    monkeypatch.setattr(
+        startup,
+        "call_command",
+        lambda name, **kwargs: calls.append((name, kwargs)),
+    )
+
+    startup.run_attachment_storage_backfill_on_startup()
+
+    assert calls == []
+
+
 def test_reset_sqlite_database_removes_existing_file(tmp_path) -> None:
     database_path = tmp_path / "stale.sqlite3"
     database_path.write_text("placeholder", encoding="utf-8")

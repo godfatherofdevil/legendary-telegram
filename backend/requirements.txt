@@ -4,6 +4,7 @@ channels==4.1.0
 channels-redis==4.2.0
 djangorestframework==3.16.1
 dj-database-url==2.3.0
+boto3==1.39.13
 psycopg[binary]==3.2.9
 pytest==8.3.5
 pytest-django==4.11.1

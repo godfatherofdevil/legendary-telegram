@@ -35,6 +35,14 @@ def run_startup_migrations() -> None:
         _run_migrate()
 
 
+def run_attachment_storage_backfill_on_startup() -> None:
+    if not env_bool("ATTACHMENTS_RUN_BACKFILL_ON_STARTUP", False):
+        return
+    if settings.ATTACHMENTS_STORAGE_BACKEND != "s3":
+        return
+    call_command("backfill_attachments_to_object_storage", verbosity=1)
+
+
 def should_reset_inconsistent_history(exc: InconsistentMigrationHistory) -> bool:
     return env_bool("DJANGO_RESET_INCONSISTENT_MIGRATIONS", False) and (
         KNOWN_ADMIN_ACCOUNTS_INCONSISTENCY in str(exc)
@@ -112,6 +120,7 @@ def main() -> None:
     validate_runtime_configuration()
     prepare_runtime_directories()
     run_startup_migrations()
+    run_attachment_storage_backfill_on_startup()
 
 
 if __name__ == "__main__":

@@ -1,11 +1,12 @@
 import socket
-from pathlib import Path
 from urllib.parse import urlparse
 
 from django.conf import settings
 from django.db import connections
 from django.db.utils import OperationalError
 from django.http import JsonResponse
+
+from apps.attachments.storage import get_attachment_storage_readiness
 
 
 def live_view(_request):
@@ -14,12 +15,13 @@ def live_view(_request):
 
 def ready_view(_request):
     redis_backend = settings.CHANNEL_LAYERS["default"]["BACKEND"]
+    attachment_storage_ok, attachment_checks = get_attachment_storage_readiness()
     checks = {
         "database": "ok",
-        "media_root": "ok" if Path(settings.MEDIA_ROOT).exists() else "missing",
         "redis_configured": bool(settings.REDIS_URL),
         "channel_layer_backend": redis_backend,
         "realtime_transport": "redis" if "RedisChannelLayer" in redis_backend else "inmemory",
+        **attachment_checks,
     }
 
     if settings.REDIS_URL:
@@ -35,7 +37,7 @@ def ready_view(_request):
     redis_ok = checks.get("redis_reachable", "ok") == "ok"
     status_code = (
         200
-        if checks["database"] == "ok" and checks["media_root"] == "ok" and redis_ok
+        if checks["database"] == "ok" and attachment_storage_ok and redis_ok
         else 503
     )
     return JsonResponse(

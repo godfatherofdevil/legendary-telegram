@@ -12,6 +12,7 @@ This deployment model includes:
 - frontend deployment
 - PostgreSQL
 - Redis
+- MinIO
 
 The backend and frontend MUST be deployed as separate services.
 
@@ -26,10 +27,12 @@ This document assumes:
 
 ## 2. Deployment Topology
 
-Local deployment consists of four services:
+Local deployment consists of six services:
 
 - `postgres` — primary relational database
 - `redis` — cache / channels broker
+- `minio` — S3-compatible object storage for attachments
+- `minio-init` — one-shot bucket bootstrap for `uploads`
 - `backend` — Django + DRF + Channels application
 - `frontend` — web client application
 
@@ -73,6 +76,10 @@ POSTGRES_PASSWORD=chat_password
 POSTGRES_PORT=5432
 
 REDIS_PORT=6379
+MINIO_PORT=9000
+MINIO_CONSOLE_PORT=9001
+MINIO_ROOT_USER=minioadmin
+MINIO_ROOT_PASSWORD=minioadmin
 
 BACKEND_PORT=8000
 FRONTEND_PORT=3000
@@ -88,6 +95,15 @@ DJANGO_SECURE_HSTS_SECONDS=0
 
 DATABASE_URL=postgresql://chat_user:chat_password@postgres:5432/chat_app
 REDIS_URL=redis://redis:6379/0
+ATTACHMENTS_STORAGE_BACKEND=s3
+ATTACHMENTS_S3_ENDPOINT_URL=http://minio:9000
+ATTACHMENTS_S3_BUCKET=uploads
+ATTACHMENTS_S3_ACCESS_KEY_ID=minioadmin
+ATTACHMENTS_S3_SECRET_ACCESS_KEY=minioadmin
+ATTACHMENTS_S3_REGION=us-east-1
+ATTACHMENTS_S3_USE_SSL=0
+ATTACHMENTS_S3_VERIFY_SSL=0
+ATTACHMENTS_RUN_BACKFILL_ON_STARTUP=0
 
 FRONTEND_API_BASE_URL=http://localhost:8000/api/v1
 FRONTEND_WS_BASE_URL=ws://localhost:8000/ws/v1/chat
@@ -101,6 +117,11 @@ FRONTEND_PROXY_TARGET=http://backend:8000
 * `DJANGO_SECURE_SSL_REDIRECT`, `DJANGO_USE_X_FORWARDED_HOST`, and `DJANGO_SECURE_HSTS_SECONDS` SHOULD be configured explicitly when running behind TLS termination or a reverse proxy.
 * `DATABASE_URL` MUST point to the `postgres` service hostname.
 * `REDIS_URL` MUST point to the `redis` service hostname.
+* `MINIO_ROOT_USER` and `MINIO_ROOT_PASSWORD` MUST match the credentials used by the local MinIO service and the bucket bootstrap step.
+* `ATTACHMENTS_STORAGE_BACKEND` supports `filesystem` for legacy local blobs and `s3` for MinIO-backed object storage.
+* When `ATTACHMENTS_STORAGE_BACKEND=s3`, the `ATTACHMENTS_S3_*` variables MUST point at the S3-compatible endpoint and target bucket.
+* `ATTACHMENTS_RUN_BACKFILL_ON_STARTUP=1` MAY be used to run the attachment backfill command automatically during backend startup when the S3 backend is active. It defaults to disabled.
+* Local Docker Compose deployment SHOULD default to `ATTACHMENTS_STORAGE_BACKEND=s3` so attachment flows and readiness checks validate the MinIO-backed topology.
 * Redis-backed realtime is required for Docker/local integration and all non-debug deployments.
 * In-memory Channels fallback is only acceptable for isolated tests or ad hoc local runs, and requires `DJANGO_ALLOW_INMEMORY_CHANNEL_LAYER=1` when `REDIS_URL` is not set.
 * Frontend API and WebSocket URLs SHOULD target the backend’s exposed local port.
@@ -151,6 +172,45 @@ services:
       timeout: 5s
       retries: 10
 
+  minio:
+    image: minio/minio:latest
+    container_name: chat_minio
+    init: true
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
+    command: ["server", "/data", "--console-address", ":9001"]
+    ports:
+      - "${MINIO_PORT:-9000}:9000"
+      - "${MINIO_CONSOLE_PORT:-9001}:9001"
+    volumes:
+      - minio_data:/data
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://127.0.0.1:9000/minio/health/live >/dev/null"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  minio-init:
+    image: minio/mc:latest
+    container_name: chat_minio_init
+    init: true
+    restart: "no"
+    env_file:
+      - .env
+    depends_on:
+      minio:
+        condition: service_healthy
+    entrypoint:
+      [
+        "/bin/sh",
+        "-c",
+        "mc alias set local http://minio:9000 \"$MINIO_ROOT_USER\" \"$MINIO_ROOT_PASSWORD\" && mc mb --ignore-existing local/uploads",
+      ]
+
   backend:
     build:
       context: ./backend
@@ -165,6 +225,8 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
+      minio-init:
+        condition: service_completed_successfully
     ports:
       - "${BACKEND_PORT:-8000}:8000"
     volumes:
@@ -206,6 +268,7 @@ services:
 volumes:
   postgres_data:
   redis_data:
+  minio_data:
   frontend_node_modules:
   media_data:
 ```
@@ -286,7 +349,7 @@ docker compose build backend
 ### Step 2: Start backend dependencies
 
 ```bash
-docker compose up -d postgres redis
+docker compose up -d postgres redis minio minio-init
 ```
 
 ### Step 3: Start backend
@@ -295,7 +358,7 @@ docker compose up -d postgres redis
 docker compose up backend
 ```
 
-The backend is healthy only when `GET /health/ready/` returns `200 OK`. The readiness endpoint verifies database connectivity and that the local media root exists for attachment storage.
+The backend is healthy only when `GET /health/ready/` returns `200 OK`. The readiness endpoint verifies database connectivity, Redis reachability, and MinIO connectivity including the required `uploads` bucket when `ATTACHMENTS_STORAGE_BACKEND=s3`.
 
 ### Step 4: Verify backend
 
@@ -331,7 +394,7 @@ docker compose build frontend
 ### Step 2: Ensure backend is running
 
 ```bash
-docker compose up -d postgres redis backend
+docker compose up -d postgres redis minio minio-init backend
 ```
 
 ### Step 3: Start frontend
@@ -378,6 +441,8 @@ docker compose up --build -d
 * backend: `http://localhost:8000`
 * postgres: `localhost:5432`
 * redis: `localhost:6379`
+* minio api: `http://localhost:9000`
+* minio console: `http://localhost:9001`
 
 ---
 
@@ -411,17 +476,23 @@ docker compose run --rm backend python manage.py createsuperuser
 
 ---
 
-## 12. Static and Media Files
+## 12. Static and Attachment Storage
 
 For minimal local deployment:
 
 * static files MAY be served by Django directly in debug mode
-* uploaded media/files MUST be stored in a backend-accessible local filesystem path
-* media storage SHOULD use a Docker volume if persistence across container recreation is needed
+* attachment blobs SHOULD be stored in MinIO bucket `uploads`
+* `minio-init` MUST create the `uploads` bucket automatically and idempotently during deployment
+* MinIO data MUST use a Docker volume so blobs persist across container recreation
+* the backend MAY still keep `MEDIA_ROOT` mounted for legacy filesystem backfill and transitional tooling
 
-Minimal optional backend volume example:
+Compose storage example:
 
 ```yaml
+minio:
+  volumes:
+    - minio_data:/data
+
 backend:
   volumes:
     - ./backend:/app
@@ -434,6 +505,7 @@ Optional root volume declaration:
 volumes:
   postgres_data:
   redis_data:
+  minio_data:
   media_data:
 ```
 
@@ -469,6 +541,12 @@ docker compose logs -f postgres
 
 ```bash
 docker compose logs -f redis
+```
+
+### View MinIO logs
+
+```bash
+docker compose logs -f minio minio-init
 ```
 
 ---
@@ -529,8 +607,11 @@ Local deployment is considered healthy only if all of the following are true:
 
 * `postgres` container is healthy
 * `redis` container is healthy
+* `minio` container is healthy
+* `minio-init` completes successfully
 * backend starts successfully
 * backend migrations apply successfully
+* backend readiness reports object storage healthy and bucket `uploads` available
 * frontend starts successfully
 * frontend can reach backend API
 * frontend can reach backend WebSocket endpoint
@@ -571,6 +652,16 @@ Check:
 * Redis channel layer is reachable
 * frontend WebSocket URL is `ws://localhost:8000/ws/v1/chat`
 
+### Backend readiness fails on object storage
+
+Check:
+
+* `minio` is healthy and reachable at `http://minio:9000`
+* `minio-init` completed successfully
+* `ATTACHMENTS_STORAGE_BACKEND=s3`
+* `ATTACHMENTS_S3_BUCKET=uploads`
+* `ATTACHMENTS_S3_ACCESS_KEY_ID` and `ATTACHMENTS_S3_SECRET_ACCESS_KEY` match the MinIO root credentials used for local deployment
+
 ---
 
 ## 18. Minimal Production Separation Note
@@ -594,6 +685,7 @@ The local deployment is valid only if:
 * frontend is deployed separately
 * postgres is deployed separately
 * redis is deployed separately
+* minio is deployed separately
 * the full stack can be started with Docker Compose from repository root
 * frontend communicates with backend over HTTP/WebSocket, not by being bundled into the backend container
 
