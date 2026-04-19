@@ -118,6 +118,13 @@ CHANNEL_LAYERS = build_channel_layers(
     redis_url=REDIS_URL,
     allow_inmemory_fallback=ALLOW_INMEMORY_CHANNEL_LAYER,
 )
+CHAT_PRESENCE_HEARTBEAT_TTL_SECONDS = int(
+    os.environ.get("CHAT_PRESENCE_HEARTBEAT_TTL_SECONDS", "90")
+)
+CHAT_PRESENCE_SNAPSHOT_TTL_SECONDS = int(
+    os.environ.get("CHAT_PRESENCE_SNAPSHOT_TTL_SECONDS", "120")
+)
+CHAT_TYPING_TTL_SECONDS = int(os.environ.get("CHAT_TYPING_TTL_SECONDS", "15"))
 CHAT_MIGRATION_FLAGS = {
     "redis_presence_enabled": env_bool("CHAT_REDIS_PRESENCE_ENABLED", False),
     "redis_fanout_enabled": env_bool("CHAT_REDIS_FANOUT_ENABLED", False),

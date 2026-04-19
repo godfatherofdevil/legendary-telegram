@@ -1,8 +1,8 @@
 from django.db.models.signals import post_delete
 from django.dispatch import receiver
 
-from apps.attachments.models import Attachment
-from apps.attachments.services import delete_attachment_file
+from .models import Attachment
+from .services import delete_attachment_file
 
 
 @receiver(post_delete, sender=Attachment)

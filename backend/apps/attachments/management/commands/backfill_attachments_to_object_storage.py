@@ -2,8 +2,8 @@ from pathlib import Path
 
 from django.core.management.base import BaseCommand, CommandError
 
-from apps.attachments.models import Attachment
-from apps.attachments.storage import (
+from ...models import Attachment
+from ...storage import (
     LocalFilesystemAttachmentStorage,
     attachment_storage_root,
     get_attachment_storage,

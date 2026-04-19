@@ -7,9 +7,9 @@ from rest_framework import status
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from apps.attachments.models import Attachment
-from apps.attachments.serializers import AttachmentUploadSerializer
-from apps.attachments.services import (
+from .models import Attachment
+from .serializers import AttachmentUploadSerializer
+from .services import (
     AttachmentConflictError,
     AttachmentValidationError,
     create_attachment,
@@ -18,8 +18,8 @@ from apps.attachments.services import (
     serialize_attachment_created,
     serialize_attachment_metadata,
 )
-from apps.attachments.storage import AttachmentObjectNotFoundError, open_attachment_for_download
-from apps.common.api import error_response, success_response
+from .storage import AttachmentObjectNotFoundError, open_attachment_for_download
+from ..common.api import error_response, success_response
 
 STREAM_CHUNK_SIZE = 64 * 1024
 INLINE_CONTENT_TYPE_PREFIXES = ("image/", "video/", "audio/")

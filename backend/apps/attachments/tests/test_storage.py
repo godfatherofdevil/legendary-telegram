@@ -12,8 +12,8 @@ from django.urls import reverse
 from django.utils import timezone
 from rest_framework.test import APIClient
 
-from apps.attachments.models import Attachment, RoomMessageAttachment
-from apps.attachments.storage import (
+from ..models import Attachment, RoomMessageAttachment
+from ..storage import (
     AttachmentObjectNotFoundError,
     S3AttachmentStorage,
     _build_s3_client,
@@ -22,8 +22,9 @@ from apps.attachments.storage import (
     get_attachment_storage_readiness,
     open_attachment_for_download,
 )
-from apps.chat.models import Room, RoomMembership, RoomMessage
-from apps.common.enums import AttachmentBindingType, RoomRole, RoomVisibility
+from ..views import _iter_attachment_chunks
+from ...chat.models import Room, RoomMembership, RoomMessage
+from ...common.enums import AttachmentBindingType, RoomRole, RoomVisibility
 
 User = get_user_model()
 
@@ -109,6 +110,20 @@ def _parse_fake_s3_range(*, Range: str, total_size: int) -> tuple[int, int]:
     return (start, min(end, total_size - 1))
 
 
+class TrackingFile:
+    def __init__(self, data: bytes) -> None:
+        self._buffer = io.BytesIO(data)
+        self.closed = False
+        self.read_sizes: list[int] = []
+
+    def read(self, size: int = -1) -> bytes:
+        self.read_sizes.append(size)
+        return self._buffer.read(size)
+
+    def close(self) -> None:
+        self.closed = True
+
+
 @pytest.fixture
 def api_client() -> APIClient:
     return APIClient()
@@ -164,6 +179,17 @@ def create_room(*, owner: User, name: str, visibility: str) -> Room:
         joined_at=timezone.now(),
     )
     return room
+
+
+def test_iter_attachment_chunks_reads_in_bounded_chunks_and_closes_file(monkeypatch) -> None:
+    file_handle = TrackingFile(b"0123456789")
+    monkeypatch.setattr("apps.attachments.views.STREAM_CHUNK_SIZE", 4)
+
+    chunks = list(_iter_attachment_chunks(file_handle, remaining_bytes=None))
+
+    assert chunks == [b"0123", b"4567", b"89"]
+    assert file_handle.read_sizes == [4, 4, 4, 4]
+    assert file_handle.closed is True
 
 
 @pytest.mark.django_db
@@ -474,6 +500,64 @@ def test_attachment_download_supports_single_range_requests_for_s3_media(
     assert response["Content-Disposition"].startswith("inline;")
     assert b"".join(response.streaming_content) == b"2345"
     assert fake_s3_client.get_object_calls[-1]["range"] == "bytes=2-5"
+
+
+@pytest.mark.django_db
+@override_settings(
+    ATTACHMENTS_STORAGE_BACKEND="s3",
+    ATTACHMENTS_S3_ENDPOINT_URL="http://minio:9000",
+    ATTACHMENTS_S3_BUCKET="uploads",
+    ATTACHMENTS_S3_ACCESS_KEY_ID="minioadmin",
+    ATTACHMENTS_S3_SECRET_ACCESS_KEY="minioadmin",
+    ATTACHMENTS_S3_USE_SSL=False,
+    ATTACHMENTS_S3_VERIFY_SSL=False,
+)
+def test_attachment_download_supports_open_ended_and_suffix_ranges_for_s3_media(
+    fake_s3_client: FakeS3Client,
+) -> None:
+    owner = create_user(email="s3-suffix-owner@example.com", username="s3suffixowner")
+    room = create_room(owner=owner, name="s3-suffix-room", visibility=RoomVisibility.PUBLIC)
+    message = RoomMessage.objects.create(room=room, sender_user=owner, text="with ranged file")
+    attachment = Attachment.objects.create(
+        uploaded_by_user=owner,
+        storage_key="range/song.mp3",
+        original_filename="song.mp3",
+        content_type="audio/mpeg",
+        size_bytes=10,
+        binding_type=AttachmentBindingType.ROOM_MESSAGE,
+    )
+    RoomMessageAttachment.objects.create(room_message=message, attachment=attachment)
+    fake_s3_client.put_object(
+        Bucket="uploads",
+        Key=attachment.storage_key,
+        Body=b"0123456789",
+        ContentType=attachment.content_type,
+        Metadata={"original_filename": attachment.original_filename},
+    )
+
+    owner_client = APIClient()
+    owner_client.force_login(owner)
+
+    open_ended_response = owner_client.get(
+        reverse("attachment-download", kwargs={"attachment_id": attachment.id}),
+        HTTP_RANGE="bytes=4-",
+    )
+    suffix_response = owner_client.get(
+        reverse("attachment-download", kwargs={"attachment_id": attachment.id}),
+        HTTP_RANGE="bytes=-3",
+    )
+
+    assert open_ended_response.status_code == 206
+    assert open_ended_response["Content-Range"] == "bytes 4-9/10"
+    assert open_ended_response["Content-Length"] == "6"
+    assert open_ended_response["Content-Disposition"].startswith("inline;")
+    assert b"".join(open_ended_response.streaming_content) == b"456789"
+
+    assert suffix_response.status_code == 206
+    assert suffix_response["Content-Range"] == "bytes 7-9/10"
+    assert suffix_response["Content-Length"] == "3"
+    assert suffix_response["Content-Disposition"].startswith("inline;")
+    assert b"".join(suffix_response.streaming_content) == b"789"
 
 
 @pytest.mark.django_db

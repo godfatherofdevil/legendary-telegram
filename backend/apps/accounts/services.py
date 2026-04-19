@@ -17,11 +17,11 @@ from django.db import transaction
 from django.db.models import Q
 from django.utils import timezone
 
-from apps.accounts.models import PasswordResetToken, UserSession
-from apps.attachments.models import Attachment
-from apps.audit.models import ModerationEvent
-from apps.chat.models import Room
-from apps.common.enums import ModerationActionType
+from .models import PasswordResetToken, UserSession
+from ..attachments.models import Attachment
+from ..audit.models import ModerationEvent
+from ..chat.models import Room
+from ..common.enums import ModerationActionType
 
 logger = logging.getLogger(__name__)
 User = get_user_model()

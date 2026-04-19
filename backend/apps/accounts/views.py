@@ -4,8 +4,8 @@ from rest_framework import permissions, status
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from apps.accounts.models import UserSession
-from apps.accounts.serializers import (
+from .models import UserSession
+from .serializers import (
     AccountDeletionSerializer,
     ChangePasswordSerializer,
     LoginSerializer,
@@ -16,7 +16,7 @@ from apps.accounts.serializers import (
     serialize_session,
     serialize_user,
 )
-from apps.accounts.services import (
+from .services import (
     authenticate_user,
     change_password,
     cleanup_expired_session_records,
@@ -28,7 +28,7 @@ from apps.accounts.services import (
     revoke_session_record,
     sync_session_record,
 )
-from apps.common.api import ConflictError, error_response, success_response
+from ..common.api import ConflictError, error_response, success_response
 
 User = get_user_model()
 

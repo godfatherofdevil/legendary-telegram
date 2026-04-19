@@ -1,6 +1,6 @@
 from django.urls import path
 
-from apps.attachments.views import (
+from .views import (
     AttachmentDetailView,
     AttachmentDownloadView,
     AttachmentListCreateView,

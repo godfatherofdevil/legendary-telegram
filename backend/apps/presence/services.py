@@ -1,37 +1,88 @@
 from collections.abc import Iterable
-from datetime import timedelta
 
+from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.db import transaction
 from django.utils import timezone
 
-from apps.accounts.models import UserSession
-from apps.accounts.services import hash_session_key
-from apps.common.enums import FriendRequestStatus, PresenceState
-from apps.presence.models import UserPresenceConnection
-from apps.social.models import FriendRequest
+from ..accounts.models import UserSession
+from ..accounts.services import hash_session_key
+from ..chat.migration.parity_checks import log_presence_parity_mismatches
+from ..chat.realtime.connection_registry import (
+    list_connections as list_redis_connections,
+)
+from ..chat.realtime.connection_registry import (
+    register_connection,
+    unregister_connection,
+    write_presence_snapshot,
+)
+from ..chat.realtime.presence import compute_presence, serialize_timestamp
+from ..common.enums import FriendRequestStatus
+from .models import UserPresenceConnection
+from ..social.models import FriendRequest
 
 User = get_user_model()
 
-AFK_TIMEOUT = timedelta(minutes=1)
-
 
 def _presence_from_connections(*, connections: list[UserPresenceConnection], now):
-    if not connections:
-        return PresenceState.OFFLINE
+    from ..chat.realtime.presence import PresenceConnectionSnapshot
 
-    active_cutoff = now - AFK_TIMEOUT
-    if any(
-        connection.is_active or connection.last_interaction_at > active_cutoff
+    snapshots = [
+        PresenceConnectionSnapshot(
+            connection_key=connection.connection_key,
+            user_id=str(connection.user_id),
+            session_id=str(connection.session_id) if connection.session_id else None,
+            tab_id=connection.tab_id,
+            is_active=connection.is_active,
+            last_interaction_at=connection.last_interaction_at,
+            last_heartbeat_at=connection.last_heartbeat_at,
+            connected_at=connection.connected_at,
+        )
         for connection in connections
-    ):
-        return PresenceState.ONLINE
-    return PresenceState.AFK
+    ]
+    return compute_presence(connections=snapshots, now=now)
+
+
+def _redis_presence_enabled() -> bool:
+    return settings.CHAT_MIGRATION_FLAGS.get("redis_presence_enabled", False)
+
+
+def _legacy_sql_presence_enabled() -> bool:
+    return settings.CHAT_MIGRATION_FLAGS.get("legacy_sql_presence_enabled", False)
+
+
+def _parity_verification_enabled() -> bool:
+    return settings.CHAT_MIGRATION_FLAGS.get("parity_verification_enabled", False)
+
+
+def _locked_user(*, user_id):
+    return User.objects.select_for_update().get(pk=user_id)
 
 
 @transaction.atomic
 def recompute_user_presence(*, user: User, now=None) -> tuple[str, timezone.datetime]:
     current_time = now or timezone.now()
+    if _redis_presence_enabled():
+        locked_user = _locked_user(user_id=user.id)
+        connections = list_redis_connections(user_id=locked_user.id)
+        computed_presence = compute_presence(connections=connections, now=current_time)
+        last_changed_at = locked_user.presence_last_changed_at
+        if computed_presence != locked_user.presence_state:
+            locked_user.presence_state = computed_presence
+            locked_user.presence_last_changed_at = current_time
+            locked_user.save(
+                update_fields=["presence_state", "presence_last_changed_at", "updated_at"]
+            )
+            last_changed_at = current_time
+        write_presence_snapshot(
+            user_id=locked_user.id,
+            presence=locked_user.presence_state,
+            last_changed_at=last_changed_at,
+        )
+        user.presence_state = locked_user.presence_state
+        user.presence_last_changed_at = last_changed_at
+        return locked_user.presence_state, last_changed_at
+
     open_connections = list(
         UserPresenceConnection.objects.select_for_update()
         .filter(user=user, disconnected_at__isnull=True)
@@ -69,14 +120,14 @@ def get_presence_snapshots(*, user_ids: Iterable[str]) -> list[dict[str, str]]:
             {
                 "user_id": str(user.id),
                 "presence": presence,
-                "last_changed_at": last_changed_at.isoformat().replace("+00:00", "Z"),
+                "last_changed_at": serialize_timestamp(last_changed_at),
             }
         )
     return payload
 
 
 def get_notification_summary(*, user: User) -> dict:
-    from apps.chat.services import list_dialog_rows, list_joined_room_rows
+    from ..chat.services import list_dialog_rows, list_joined_room_rows
 
     memberships, room_unread_counts = list_joined_room_rows(user=user)
     dialogs, dialog_unread_counts, _last_messages = list_dialog_rows(user=user)
@@ -107,7 +158,7 @@ def serialize_presence_update(*, user: User) -> dict:
     return {
         "user_id": str(user.id),
         "presence": user.presence_state,
-        "last_changed_at": user.presence_last_changed_at.isoformat().replace("+00:00", "Z"),
+        "last_changed_at": serialize_timestamp(user.presence_last_changed_at),
     }
 
 
@@ -120,8 +171,7 @@ def _get_session_record(*, session_key: str | None) -> UserSession | None:
     ).first()
 
 
-@transaction.atomic
-def upsert_presence_connection(
+def _legacy_upsert_presence_connection(
     *,
     user: User,
     connection_key: str,
@@ -130,9 +180,8 @@ def upsert_presence_connection(
     is_active: bool = True,
     last_interaction_at=None,
     now=None,
-) -> dict | None:
+) -> None:
     current_time = now or timezone.now()
-    previous_presence = user.presence_state
     defaults = {
         "user": user,
         "session": _get_session_record(session_key=session_key),
@@ -147,6 +196,79 @@ def upsert_presence_connection(
         connection_key=connection_key,
         defaults=defaults,
     )
+
+
+def _legacy_close_presence_connection(*, user: User, connection_key: str, now=None) -> None:
+    current_time = now or timezone.now()
+    UserPresenceConnection.objects.filter(
+        connection_key=connection_key,
+        user=user,
+        disconnected_at__isnull=True,
+    ).update(
+        disconnected_at=current_time,
+        updated_at=current_time,
+    )
+
+
+@transaction.atomic
+def upsert_presence_connection(
+    *,
+    user: User,
+    connection_key: str,
+    session_key: str | None,
+    tab_id: str | None = None,
+    is_active: bool = True,
+    last_interaction_at=None,
+    now=None,
+) -> dict | None:
+    current_time = now or timezone.now()
+    if _redis_presence_enabled():
+        session_record = _get_session_record(session_key=session_key)
+        if _legacy_sql_presence_enabled():
+            _legacy_upsert_presence_connection(
+                user=user,
+                connection_key=connection_key,
+                session_key=session_key,
+                tab_id=tab_id,
+                is_active=is_active,
+                last_interaction_at=last_interaction_at,
+                now=current_time,
+            )
+
+        register_connection(
+            user_id=user.id,
+            connection_key=connection_key,
+            session_id=str(session_record.id) if session_record else None,
+            tab_id=tab_id or connection_key,
+            is_active=is_active,
+            last_interaction_at=last_interaction_at or current_time,
+            now=current_time,
+        )
+        locked_user = _locked_user(user_id=user.id)
+        previous_presence = locked_user.presence_state
+        presence, last_changed_at = recompute_user_presence(user=locked_user, now=current_time)
+        if _legacy_sql_presence_enabled() and _parity_verification_enabled():
+            log_presence_parity_mismatches(
+                user=locked_user,
+                redis_connections=list_redis_connections(user_id=locked_user.id),
+                now=current_time,
+            )
+        user.presence_state = presence
+        user.presence_last_changed_at = last_changed_at
+        if presence == previous_presence:
+            return None
+        return serialize_presence_update(user=locked_user)
+
+    previous_presence = user.presence_state
+    _legacy_upsert_presence_connection(
+        user=user,
+        connection_key=connection_key,
+        session_key=session_key,
+        tab_id=tab_id,
+        is_active=is_active,
+        last_interaction_at=last_interaction_at,
+        now=current_time,
+    )
     recompute_user_presence(user=user, now=current_time)
     user.refresh_from_db(fields=["presence_state", "presence_last_changed_at"])
     if user.presence_state == previous_presence:
@@ -157,15 +279,31 @@ def upsert_presence_connection(
 @transaction.atomic
 def close_presence_connection(*, user: User, connection_key: str, now=None) -> dict | None:
     current_time = now or timezone.now()
+    if _redis_presence_enabled():
+        if _legacy_sql_presence_enabled():
+            _legacy_close_presence_connection(
+                user=user,
+                connection_key=connection_key,
+                now=current_time,
+            )
+        unregister_connection(user_id=user.id, connection_key=connection_key)
+        locked_user = _locked_user(user_id=user.id)
+        previous_presence = locked_user.presence_state
+        presence, last_changed_at = recompute_user_presence(user=locked_user, now=current_time)
+        if _legacy_sql_presence_enabled() and _parity_verification_enabled():
+            log_presence_parity_mismatches(
+                user=locked_user,
+                redis_connections=list_redis_connections(user_id=locked_user.id),
+                now=current_time,
+            )
+        user.presence_state = presence
+        user.presence_last_changed_at = last_changed_at
+        if presence == previous_presence:
+            return None
+        return serialize_presence_update(user=locked_user)
+
     previous_presence = user.presence_state
-    UserPresenceConnection.objects.filter(
-        connection_key=connection_key,
-        user=user,
-        disconnected_at__isnull=True,
-    ).update(
-        disconnected_at=current_time,
-        updated_at=current_time,
-    )
+    _legacy_close_presence_connection(user=user, connection_key=connection_key, now=current_time)
     recompute_user_presence(user=user, now=current_time)
     user.refresh_from_db(fields=["presence_state", "presence_last_changed_at"])
     if user.presence_state == previous_presence:

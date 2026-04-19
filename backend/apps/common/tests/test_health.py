@@ -3,7 +3,7 @@ from django.test import override_settings
 from django.urls import reverse
 from rest_framework.test import APIClient
 
-from apps.common import views
+from .. import views
 
 
 @pytest.fixture

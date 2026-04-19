@@ -1,6 +1,6 @@
 from django.urls import path
 
-from apps.accounts.views import (
+from .views import (
     ChangePasswordView,
     DeleteAccountView,
     LoginView,

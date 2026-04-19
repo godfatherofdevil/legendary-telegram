@@ -8,16 +8,16 @@ from django.contrib.sessions.models import Session
 from django.http.cookie import parse_cookie
 from rest_framework import serializers
 
-from apps.chat.models import Dialog, Room
-from apps.chat.realtime import (
+from .models import Dialog, Room
+from .realtime import (
     PRESENCE_GROUP,
     dialog_group,
     publish_dialog_summary_updated,
     room_group,
     user_group,
 )
-from apps.chat.serializers import serialize_dialog_message, serialize_room_message
-from apps.chat.services import (
+from .serializers import serialize_dialog_message, serialize_room_message
+from .services import (
     DomainForbiddenError,
     DomainValidationError,
     create_dialog_message,
@@ -32,7 +32,7 @@ from apps.chat.services import (
     update_dialog_message,
     update_room_message,
 )
-from apps.chat.ws_serializers import (
+from .ws_serializers import (
     DialogMessageDeleteSerializer,
     DialogMessageEditSerializer,
     DialogMessageSendSerializer,
@@ -45,7 +45,7 @@ from apps.chat.ws_serializers import (
     RoomReadSerializer,
     RoomSubscriptionSerializer,
 )
-from apps.presence.services import close_presence_connection, upsert_presence_connection
+from ..presence.services import close_presence_connection, upsert_presence_connection
 
 User = get_user_model()
 os.environ.setdefault("DJANGO_ALLOW_ASYNC_UNSAFE", "true")

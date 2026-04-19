@@ -6,11 +6,11 @@ from django.urls import reverse
 from django.utils import timezone
 from rest_framework.test import APIClient
 
-from apps.attachments.models import Attachment, RoomMessageAttachment
-from apps.attachments.storage import attachment_absolute_path
-from apps.chat.models import Dialog, Room, RoomBan, RoomMembership, RoomMessage
-from apps.common.enums import AttachmentBindingType, RoomRole, RoomVisibility
-from apps.social.models import Friendship
+from ..models import Attachment, RoomMessageAttachment
+from ..storage import attachment_absolute_path
+from ...chat.models import Dialog, Room, RoomBan, RoomMembership, RoomMessage
+from ...common.enums import AttachmentBindingType, RoomRole, RoomVisibility
+from ...social.models import Friendship
 
 User = get_user_model()
 

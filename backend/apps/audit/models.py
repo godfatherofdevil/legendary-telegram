@@ -1,7 +1,7 @@
 from django.db import models
 
-from apps.common.enums import ModerationActionType
-from apps.common.models import CreatedAtModel
+from ..common.enums import ModerationActionType
+from ..common.models import CreatedAtModel
 
 
 class ModerationEvent(CreatedAtModel):

@@ -1,6 +1,6 @@
 from django.core.exceptions import ImproperlyConfigured
 
-from apps.chat.realtime import PRESENCE_GROUP, dialog_group, room_group, user_group
+from ..realtime import PRESENCE_GROUP, dialog_group, room_group, user_group
 from config import settings
 
 

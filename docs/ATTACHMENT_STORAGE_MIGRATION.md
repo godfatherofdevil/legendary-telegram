@@ -63,3 +63,11 @@ Set `ATTACHMENTS_RUN_BACKFILL_ON_STARTUP=1` to run the same backfill command aut
 - The filesystem backend remains available for tests, local fallback, and rollback.
 - When the S3 backend is active, attachment downloads fall back to legacy filesystem blobs if the S3 object is still missing.
 - Public API payloads and authorization rules stay unchanged across both backends.
+
+## Download Delivery Strategy
+
+- Attachment downloads stay on the backend `GET /api/v1/attachments/{attachment_id}/download` route so authorization is checked on every request.
+- The backend uses `StreamingHttpResponse` and streams MinIO-backed objects in bounded chunks instead of buffering the full blob in Django memory.
+- Inline-safe media types (`image/*`, `video/*`, `audio/*`) return `Content-Disposition: inline`; other content types return `attachment`.
+- The backend supports single `Range` requests and forwards the requested byte span to object storage so browser media playback and seeking can fetch only the needed bytes.
+- Presigned public object URLs and long-lived redirects are intentionally not used because they would weaken immediate access revocation guarantees.

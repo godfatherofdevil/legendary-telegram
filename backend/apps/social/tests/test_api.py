@@ -3,8 +3,8 @@ from django.contrib.auth import get_user_model
 from django.urls import reverse
 from rest_framework.test import APIClient
 
-from apps.chat.models import Dialog, DialogMessage
-from apps.social.models import FriendRequest, Friendship, PeerBan
+from ...chat.models import Dialog, DialogMessage
+from ..models import FriendRequest, Friendship, PeerBan
 
 User = get_user_model()
 

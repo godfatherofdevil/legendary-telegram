@@ -2,9 +2,9 @@ import pytest
 from django.db import IntegrityError
 from django.utils import timezone
 
-from apps.accounts.models import User
-from apps.chat.models import Dialog, Room, RoomInvitation
-from apps.common.enums import RoomInvitationStatus, RoomVisibility
+from ...accounts.models import User
+from ..models import Dialog, Room, RoomInvitation
+from ...common.enums import RoomInvitationStatus, RoomVisibility
 
 
 @pytest.mark.django_db

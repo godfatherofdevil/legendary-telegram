@@ -2,13 +2,13 @@ from rest_framework import status
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from apps.chat.realtime import (
+from ..chat.realtime import (
     publish_dialog_summary_updated,
     publish_friend_request_created,
     publish_friend_request_updated,
 )
-from apps.common.api import error_response, success_response
-from apps.social.serializers import (
+from ..common.api import error_response, success_response
+from .serializers import (
     FriendRequestCreateSerializer,
     PeerBanCreateSerializer,
     serialize_created_friend_request,
@@ -17,7 +17,7 @@ from apps.social.serializers import (
     serialize_outgoing_friend_request,
     serialize_peer_ban,
 )
-from apps.social.services import (
+from .services import (
     SocialConflictError,
     SocialForbiddenError,
     SocialValidationError,

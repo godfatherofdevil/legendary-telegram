@@ -7,11 +7,11 @@ from django.contrib.auth import get_user_model
 from django.core.files.uploadedfile import UploadedFile
 from django.db import transaction
 
-from apps.accounts.serializers import serialize_public_user
-from apps.attachments.models import Attachment, DialogMessageAttachment, RoomMessageAttachment
-from apps.attachments.storage import delete_attachment_from_storage, get_attachment_storage
-from apps.chat.models import RoomBan, RoomMembership
-from apps.common.enums import AttachmentBindingType
+from ..accounts.serializers import serialize_public_user
+from .models import Attachment, DialogMessageAttachment, RoomMessageAttachment
+from .storage import delete_attachment_from_storage, get_attachment_storage
+from ..chat.models import RoomBan, RoomMembership
+from ..common.enums import AttachmentBindingType
 
 User = get_user_model()
 

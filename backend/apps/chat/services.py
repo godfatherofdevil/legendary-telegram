@@ -8,13 +8,13 @@ from django.db.models import Count, Prefetch, Q
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
 
-from apps.attachments.models import Attachment, DialogMessageAttachment, RoomMessageAttachment
-from apps.attachments.services import (
+from ..attachments.models import Attachment, DialogMessageAttachment, RoomMessageAttachment
+from ..attachments.services import (
     delete_dialog_message_attachments,
     delete_room_message_attachments,
 )
-from apps.audit.models import ModerationEvent
-from apps.chat.models import (
+from ..audit.models import ModerationEvent
+from .models import (
     Dialog,
     DialogMessage,
     DialogReadState,
@@ -25,8 +25,8 @@ from apps.chat.models import (
     RoomMessage,
     RoomReadState,
 )
-from apps.common.enums import AttachmentBindingType, ModerationActionType, RoomRole, RoomVisibility
-from apps.social.models import Friendship, PeerBan
+from ..common.enums import AttachmentBindingType, ModerationActionType, RoomRole, RoomVisibility
+from ..social.models import Friendship, PeerBan
 
 User = get_user_model()
 MESSAGE_TEXT_LIMIT_BYTES = 3 * 1024

@@ -1,8 +1,8 @@
 from django.contrib.auth import get_user_model
 from rest_framework import serializers
 
-from apps.accounts.serializers import serialize_public_user
-from apps.chat.models import (
+from ..accounts.serializers import serialize_public_user
+from .models import (
     Dialog,
     DialogMessage,
     Room,
@@ -11,7 +11,7 @@ from apps.chat.models import (
     RoomMembership,
     RoomMessage,
 )
-from apps.common.enums import ChatType, RoomVisibility
+from ..common.enums import ChatType, RoomVisibility
 
 User = get_user_model()
 

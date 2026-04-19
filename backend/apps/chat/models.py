@@ -1,8 +1,8 @@
 from django.db import models
 from django.db.models import F, Q
 
-from apps.common.enums import RoomInvitationStatus, RoomRole, RoomVisibility
-from apps.common.models import CreatedAtModel, TimestampedModel
+from ..common.enums import RoomInvitationStatus, RoomRole, RoomVisibility
+from ..common.models import CreatedAtModel, TimestampedModel
 
 
 class Room(TimestampedModel):

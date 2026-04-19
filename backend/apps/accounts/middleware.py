@@ -1,4 +1,4 @@
-from apps.accounts.services import sync_session_record
+from .services import sync_session_record
 
 
 class SessionTrackingMiddleware:

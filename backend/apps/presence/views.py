@@ -1,9 +1,9 @@
 from rest_framework import status
 from rest_framework.views import APIView
 
-from apps.common.api import success_response
-from apps.presence.serializers import PresenceQuerySerializer
-from apps.presence.services import get_notification_summary, get_presence_snapshots
+from ..common.api import success_response
+from .serializers import PresenceQuerySerializer
+from .services import get_notification_summary, get_presence_snapshots
 
 
 class PresenceQueryView(APIView):

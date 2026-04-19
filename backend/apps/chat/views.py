@@ -5,8 +5,8 @@ from rest_framework import status
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from apps.chat.models import Room, RoomInvitation
-from apps.chat.realtime import (
+from .models import Room, RoomInvitation
+from .realtime import (
     force_room_unsubscribe,
     publish_dialog_message_created,
     publish_dialog_message_deleted,
@@ -20,7 +20,7 @@ from apps.chat.realtime import (
     publish_room_message_updated,
     publish_room_read_updated,
 )
-from apps.chat.serializers import (
+from .serializers import (
     DialogCreateSerializer,
     MessageCreateSerializer,
     MessageUpdateSerializer,
@@ -41,7 +41,7 @@ from apps.chat.serializers import (
     serialize_room_message,
     serialize_room_update,
 )
-from apps.chat.services import (
+from .services import (
     DomainConflictError,
     DomainForbiddenError,
     DomainValidationError,
@@ -80,8 +80,8 @@ from apps.chat.services import (
     update_room,
     update_room_message,
 )
-from apps.common.api import error_response, success_response
-from apps.common.enums import ModerationActionType
+from ..common.api import error_response, success_response
+from ..common.enums import ModerationActionType
 
 User = get_user_model()
 

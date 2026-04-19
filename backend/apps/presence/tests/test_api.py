@@ -6,10 +6,10 @@ from django.urls import reverse
 from django.utils import timezone
 from rest_framework.test import APIClient
 
-from apps.chat.models import Dialog, DialogMessage, Room, RoomMembership, RoomMessage
-from apps.common.enums import FriendRequestStatus, PresenceState, RoomRole, RoomVisibility
-from apps.presence.models import UserPresenceConnection
-from apps.social.models import FriendRequest, Friendship
+from ...chat.models import Dialog, DialogMessage, Room, RoomMembership, RoomMessage
+from ...common.enums import FriendRequestStatus, PresenceState, RoomRole, RoomVisibility
+from ..models import UserPresenceConnection
+from ...social.models import FriendRequest, Friendship
 
 User = get_user_model()
 

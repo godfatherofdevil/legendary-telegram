@@ -5,8 +5,8 @@ from django.db import models
 from django.db.models.functions import Lower
 from django.utils import timezone
 
-from apps.common.enums import PresenceState
-from apps.common.models import CreatedAtModel, TimestampedModel
+from ..common.enums import PresenceState
+from ..common.models import CreatedAtModel, TimestampedModel
 
 
 class UserManager(BaseUserManager):

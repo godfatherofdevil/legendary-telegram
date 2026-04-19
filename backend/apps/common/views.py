@@ -6,7 +6,7 @@ from django.db import connections
 from django.db.utils import OperationalError
 from django.http import JsonResponse
 
-from apps.attachments.storage import get_attachment_storage_readiness
+from ..attachments.storage import get_attachment_storage_readiness
 
 
 def live_view(_request):

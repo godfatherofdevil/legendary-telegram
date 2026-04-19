@@ -14,9 +14,9 @@ from django.test import Client
 from django.urls import reverse
 from django.utils import timezone
 
-from apps.chat.models import Dialog, Room, RoomMembership
-from apps.common.enums import RoomRole, RoomVisibility
-from apps.social.models import Friendship
+from ..models import Dialog, Room, RoomMembership
+from ...common.enums import RoomRole, RoomVisibility
+from ...social.models import Friendship
 from config.asgi import application
 
 User = get_user_model()

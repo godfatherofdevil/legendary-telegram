@@ -782,7 +782,7 @@ Provide a deterministic migration path for attachments that already exist on loc
 ---
 
 ### T6.8 Implement streaming-safe attachment delivery for inline media
-**Status:** TODO
+**Status:** DONE
 
 #### Objective
 Prevent large attachment downloads from exhausting backend memory or crashing browser media rendering by serving object-storage-backed media as a streamed response path.
@@ -814,6 +814,12 @@ Prevent large attachment downloads from exhausting backend memory or crashing br
 - range-request test for authorized media download if range support is implemented
 - authorization regression tests for revoked room/dialog access
 - large-object integration smoke test that avoids loading the full payload into process memory
+
+#### Implementation Notes
+- backend attachment downloads use `StreamingHttpResponse` and bounded chunk iteration
+- image, video, and audio attachments return `Content-Disposition: inline`
+- single-range passthrough is supported for object-storage-backed downloads, including open-ended and suffix ranges
+- legacy filesystem fallback remains available during MinIO cutover without changing authorization behavior
 
 ---
 
@@ -1230,6 +1236,12 @@ Keep the chat UI usable when messages contain large images or videos by avoiding
 - vitest frontend rendering test for image attachments
 - vitest frontend rendering test for video attachments with non-eager loading behavior
 - manual browser validation notes for large-media preview and playback
+
+#### Implementation Notes
+- small images render inline with lazy image loading
+- large images and videos require explicit user action before preview media is requested
+- video previews use `preload=\"metadata\"` so the browser can inspect playable media without eagerly downloading the full object
+- non-previewable files continue to use explicit download/open links only
 
 ---
 

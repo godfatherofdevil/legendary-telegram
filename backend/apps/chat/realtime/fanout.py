@@ -3,17 +3,17 @@ import asyncio
 from asgiref.sync import async_to_sync
 from channels.layers import get_channel_layer
 
-from apps.chat.models import DialogMessage, RoomMessage
-from apps.chat.realtime.groups import PRESENCE_GROUP, dialog_group, room_group, user_group
-from apps.chat.realtime.serializers import build_broadcast_event, build_control_event
-from apps.chat.serializers import (
+from ..models import DialogMessage, RoomMessage
+from ..realtime.groups import PRESENCE_GROUP, dialog_group, room_group, user_group
+from ..realtime.serializers import build_broadcast_event, build_control_event
+from ..serializers import (
     _isoformat,
     serialize_dialog_message,
     serialize_dialog_summary_for_user,
     serialize_room_message,
 )
-from apps.chat.services import get_dialog_unread_count
-from apps.social.serializers import (
+from ..services import get_dialog_unread_count
+from ...social.serializers import (
     serialize_friend_request_update,
     serialize_incoming_friend_request,
 )

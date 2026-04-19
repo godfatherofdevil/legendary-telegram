@@ -2,8 +2,8 @@ import pytest
 from django.db import IntegrityError
 from django.utils import timezone
 
-from apps.accounts.models import User
-from apps.social.models import FriendRequest, Friendship
+from ...accounts.models import User
+from ..models import FriendRequest, Friendship
 
 
 @pytest.mark.django_db

@@ -1,6 +1,6 @@
 from django.db import models
 
-from apps.common.models import TimestampedModel
+from ..common.models import TimestampedModel
 
 
 class UserPresenceConnection(TimestampedModel):

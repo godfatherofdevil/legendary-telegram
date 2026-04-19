@@ -1,8 +1,8 @@
 from django.db import models
 from django.db.models import F, Q
 
-from apps.common.enums import FriendRequestStatus
-from apps.common.models import CreatedAtModel, TimestampedModel
+from ..common.enums import FriendRequestStatus
+from ..common.models import CreatedAtModel, TimestampedModel
 
 
 class FriendRequest(TimestampedModel):

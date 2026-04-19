@@ -6,10 +6,10 @@ from django.db.models import Q
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
 
-from apps.audit.models import ModerationEvent
-from apps.chat.models import Dialog
-from apps.common.enums import FriendRequestStatus, ModerationActionType
-from apps.social.models import FriendRequest, Friendship, PeerBan
+from ..audit.models import ModerationEvent
+from ..chat.models import Dialog
+from ..common.enums import FriendRequestStatus, ModerationActionType
+from .models import FriendRequest, Friendship, PeerBan
 
 User = get_user_model()
 

@@ -1,6 +1,6 @@
 from django.urls import path
 
-from apps.social.views import (
+from .views import (
     FriendDetailView,
     FriendListView,
     FriendRequestAcceptView,

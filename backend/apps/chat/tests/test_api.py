@@ -6,8 +6,8 @@ from django.urls import reverse
 from django.utils import timezone
 from rest_framework.test import APIClient
 
-from apps.attachments.models import Attachment, DialogMessageAttachment, RoomMessageAttachment
-from apps.chat.models import (
+from ...attachments.models import Attachment, DialogMessageAttachment, RoomMessageAttachment
+from ..models import (
     Dialog,
     DialogMessage,
     DialogReadState,
@@ -17,9 +17,9 @@ from apps.chat.models import (
     RoomMessage,
     RoomReadState,
 )
-from apps.chat.services import PageWindow, list_dialog_rows, list_room_message_rows
-from apps.common.enums import AttachmentBindingType, RoomRole, RoomVisibility
-from apps.social.models import Friendship, PeerBan
+from ..services import PageWindow, list_dialog_rows, list_room_message_rows
+from ...common.enums import AttachmentBindingType, RoomRole, RoomVisibility
+from ...social.models import Friendship, PeerBan
 
 User = get_user_model()
 

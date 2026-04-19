@@ -1,7 +1,7 @@
 from django.db import models
 
-from apps.common.enums import AttachmentBindingType
-from apps.common.models import CreatedAtModel, TimestampedModel
+from ..common.enums import AttachmentBindingType
+from ..common.models import CreatedAtModel, TimestampedModel
 
 
 class Attachment(TimestampedModel):
