@@ -130,6 +130,7 @@ FRONTEND_PROXY_TARGET=http://backend:8000
 * Redis-backed realtime is required for Docker/local integration and all non-debug deployments.
 * In-memory Channels fallback is only acceptable for isolated tests or ad hoc local runs, and requires `DJANGO_ALLOW_INMEMORY_CHANNEL_LAYER=1` when `REDIS_URL` is not set.
 * Frontend API and WebSocket URLs SHOULD target the backend’s exposed local port.
+* Host-local `make backend-local` and `make frontend-local` workflows SHOULD export `.local/.env` before launching so local processes can use a host-only configuration source without mutating the Docker Compose `.env`.
 
 ---
 

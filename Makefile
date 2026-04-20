@@ -3,6 +3,7 @@ SHELL := /bin/bash
 
 VENV := .venv
 COMPOSE := docker compose
+EXPORT_LOCAL_ENV = set -a; if [ -f .local/.env ]; then . ./.local/.env; fi; set +a
 
 .PHONY: help venv backend-install frontend-install install backend-test frontend-test \
 	backend-lint backend-lint-fix backend-format backend-format-check frontend-lint frontend-lint-fix lint lint-fix backend-migrate backend-local frontend-local \
@@ -87,10 +88,11 @@ backend-migrate:
 	. $(VENV)/bin/activate && cd backend && python manage.py migrate
 
 backend-local:
-	. $(VENV)/bin/activate && cd backend && python -m config.entrypoint
+	@$(EXPORT_LOCAL_ENV) && . $(VENV)/bin/activate && cd backend && python -m config.entrypoint
 
 frontend-local:
-	cd frontend && \
+	@$(EXPORT_LOCAL_ENV) && cd frontend && \
+	exec env \
 	FRONTEND_PROXY_TARGET="$${FRONTEND_PROXY_TARGET:-http://127.0.0.1:8000}" \
 	FRONTEND_API_BASE_URL="$${FRONTEND_API_BASE_URL:-http://127.0.0.1:8000/api/v1}" \
 	FRONTEND_WS_BASE_URL="$${FRONTEND_WS_BASE_URL:-ws://127.0.0.1:8000/ws/v1/chat}" \

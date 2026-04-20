@@ -342,7 +342,7 @@ make infra-up
 make backend-local
 ```
 
-This host-local workflow uses the repository `.venv`, Django's local defaults, SQLite when `DATABASE_URL` is unset, and the in-memory Channels layer while `DJANGO_DEBUG=1`.
+This host-local workflow uses the repository `.venv` and auto-exports `.local/.env` before startup when it exists. It otherwise falls back to Django's local defaults, SQLite when `DATABASE_URL` is unset, and the in-memory Channels layer while `DJANGO_DEBUG=1`.
 
 ---
 
@@ -352,7 +352,7 @@ This host-local workflow uses the repository `.venv`, Django's local defaults, S
 make frontend-local
 ```
 
-The target forces the Vite proxy to `http://127.0.0.1:8000` so it works against a host-local backend without requiring Docker service DNS names.
+The target auto-exports `.local/.env` before startup so Vite can resolve local frontend variables even though it runs from `frontend/`. It also forces the proxy fallback to `http://127.0.0.1:8000` so it works against a host-local backend without requiring Docker service DNS names. Frontend Vite entrypoints also preload a small Node compatibility shim so `structuredClone` is available on older local Node runtimes.
 
 ---
 
