@@ -50,9 +50,7 @@ def test_friend_request_list_and_accept_flow(api_client: APIClient) -> None:
     assert incoming_response.status_code == 200
     assert incoming_response.json()["data"][0]["from_user"]["username"] == "alice-social"
 
-    accept_response = bob_client.post(
-        reverse("friend-request-accept", kwargs={"request_id": request_id})
-    )
+    accept_response = bob_client.post(reverse("friend-request-accept", kwargs={"request_id": request_id}))
 
     assert accept_response.status_code == 200
     assert accept_response.json()["data"]["friendship"]["user"]["username"] == "alice-social"
@@ -112,9 +110,7 @@ def test_friend_request_reject_and_conflict_rules(api_client: APIClient) -> None
     assert already_friend_response.status_code == 409
 
     pending = FriendRequest.objects.create(from_user=alice, to_user=bob, message="hi")
-    reject_response = bob_client.post(
-        reverse("friend-request-reject", kwargs={"request_id": pending.id})
-    )
+    reject_response = bob_client.post(reverse("friend-request-reject", kwargs={"request_id": pending.id}))
     assert reject_response.status_code == 204
     pending.refresh_from_db()
     assert pending.status == "rejected"
@@ -131,9 +127,7 @@ def test_remove_friend_and_peer_ban_update_dialog_state(api_client: APIClient) -
     alice_client = APIClient()
     alice_client.force_login(alice)
 
-    remove_friend_response = alice_client.delete(
-        reverse("friend-detail", kwargs={"user_id": bob.id})
-    )
+    remove_friend_response = alice_client.delete(reverse("friend-detail", kwargs={"user_id": bob.id}))
     assert remove_friend_response.status_code == 204
     dialog.refresh_from_db()
     assert dialog.is_frozen is True
@@ -157,9 +151,7 @@ def test_remove_friend_and_peer_ban_update_dialog_state(api_client: APIClient) -
     assert list_response.status_code == 200
     assert list_response.json()["data"][0]["user"]["username"] == "bob-ban"
 
-    remove_ban_response = alice_client.delete(
-        reverse("peer-ban-detail", kwargs={"user_id": bob.id})
-    )
+    remove_ban_response = alice_client.delete(reverse("peer-ban-detail", kwargs={"user_id": bob.id}))
     assert remove_ban_response.status_code == 204
     dialog.refresh_from_db()
     assert dialog.is_frozen is True
@@ -231,12 +223,8 @@ def test_peer_ban_freezes_existing_dialog_sends_for_both_users(api_client: APICl
         {"text": "blocked"},
         format="json",
     )
-    alice_history_response = alice_client.get(
-        reverse("dialog-message-list-create", kwargs={"dialog_id": dialog.id})
-    )
-    bob_history_response = bob_client.get(
-        reverse("dialog-message-list-create", kwargs={"dialog_id": dialog.id})
-    )
+    alice_history_response = alice_client.get(reverse("dialog-message-list-create", kwargs={"dialog_id": dialog.id}))
+    bob_history_response = bob_client.get(reverse("dialog-message-list-create", kwargs={"dialog_id": dialog.id}))
 
     assert ban_response.status_code == 201
     assert alice_send_response.status_code == 403

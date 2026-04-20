@@ -6,11 +6,11 @@ from django.urls import reverse
 from django.utils import timezone
 from rest_framework.test import APIClient
 
-from ..models import Attachment, RoomMessageAttachment
-from ..storage import attachment_absolute_path
 from ...chat.models import Dialog, Room, RoomBan, RoomMembership, RoomMessage
 from ...common.enums import AttachmentBindingType, RoomRole, RoomVisibility
 from ...social.models import Friendship
+from ..models import Attachment, RoomMessageAttachment
+from ..storage import attachment_absolute_path
 
 User = get_user_model()
 
@@ -149,15 +149,9 @@ def test_attachment_metadata_and_download_require_current_room_access(
     outsider_client = APIClient()
     outsider_client.force_login(outsider)
 
-    metadata_response = member_client.get(
-        reverse("attachment-detail", kwargs={"attachment_id": attachment.id})
-    )
-    download_response = member_client.get(
-        reverse("attachment-download", kwargs={"attachment_id": attachment.id})
-    )
-    outsider_response = outsider_client.get(
-        reverse("attachment-detail", kwargs={"attachment_id": attachment.id})
-    )
+    metadata_response = member_client.get(reverse("attachment-detail", kwargs={"attachment_id": attachment.id}))
+    download_response = member_client.get(reverse("attachment-download", kwargs={"attachment_id": attachment.id}))
+    outsider_response = outsider_client.get(reverse("attachment-detail", kwargs={"attachment_id": attachment.id}))
 
     assert metadata_response.status_code == 200
     assert metadata_response.json()["data"]["attachment"] == {
@@ -173,9 +167,7 @@ def test_attachment_metadata_and_download_require_current_room_access(
     assert outsider_response.status_code == 404
 
     RoomMembership.objects.filter(room=room, user=member).delete()
-    revoked_response = member_client.get(
-        reverse("attachment-download", kwargs={"attachment_id": attachment.id})
-    )
+    revoked_response = member_client.get(reverse("attachment-download", kwargs={"attachment_id": attachment.id}))
     assert revoked_response.status_code == 404
 
     RoomMembership.objects.create(
@@ -185,9 +177,7 @@ def test_attachment_metadata_and_download_require_current_room_access(
         joined_at=timezone.now(),
     )
     RoomBan.objects.create(room=room, user=member, banned_by_user=owner)
-    banned_response = member_client.get(
-        reverse("attachment-detail", kwargs={"attachment_id": attachment.id})
-    )
+    banned_response = member_client.get(reverse("attachment-detail", kwargs={"attachment_id": attachment.id}))
     assert banned_response.status_code == 404
 
 
@@ -231,15 +221,9 @@ def test_attachment_delete_allows_unbound_owner_only_and_rejects_bound(
     owner_client = APIClient()
     owner_client.force_login(owner)
 
-    other_delete = other_client.delete(
-        reverse("attachment-detail", kwargs={"attachment_id": unbound.id})
-    )
-    owner_delete = owner_client.delete(
-        reverse("attachment-detail", kwargs={"attachment_id": unbound.id})
-    )
-    bound_delete = owner_client.delete(
-        reverse("attachment-detail", kwargs={"attachment_id": bound.id})
-    )
+    other_delete = other_client.delete(reverse("attachment-detail", kwargs={"attachment_id": unbound.id}))
+    owner_delete = owner_client.delete(reverse("attachment-detail", kwargs={"attachment_id": unbound.id}))
+    bound_delete = owner_client.delete(reverse("attachment-detail", kwargs={"attachment_id": bound.id}))
 
     assert other_delete.status_code == 404
     assert owner_delete.status_code == 204
@@ -281,17 +265,11 @@ def test_room_deletion_revokes_attachment_access_and_removes_file(api_client: AP
     member_client = APIClient()
     member_client.force_login(member)
 
-    assert member_client.get(
-        reverse("attachment-detail", kwargs={"attachment_id": attachment.id})
-    ).status_code == 200
+    assert member_client.get(reverse("attachment-detail", kwargs={"attachment_id": attachment.id})).status_code == 200
 
     delete_response = owner_client.delete(reverse("room-detail", kwargs={"room_id": room.id}))
-    detail_response = member_client.get(
-        reverse("attachment-detail", kwargs={"attachment_id": attachment.id})
-    )
-    download_response = member_client.get(
-        reverse("attachment-download", kwargs={"attachment_id": attachment.id})
-    )
+    detail_response = member_client.get(reverse("attachment-detail", kwargs={"attachment_id": attachment.id}))
+    download_response = member_client.get(reverse("attachment-download", kwargs={"attachment_id": attachment.id}))
 
     assert delete_response.status_code == 204
     assert detail_response.status_code == 404
@@ -328,15 +306,8 @@ def test_dialog_attachment_access_is_limited_to_participants(api_client: APIClie
     outsider_client = APIClient()
     outsider_client.force_login(outsider)
 
-    bob_metadata = bob_client.get(
-        reverse("attachment-detail", kwargs={"attachment_id": attachment.id})
-    )
-    outsider_download = outsider_client.get(
-        reverse("attachment-download", kwargs={"attachment_id": attachment.id})
-    )
+    bob_metadata = bob_client.get(reverse("attachment-detail", kwargs={"attachment_id": attachment.id}))
+    outsider_download = outsider_client.get(reverse("attachment-download", kwargs={"attachment_id": attachment.id}))
 
     assert bob_metadata.status_code == 200
-    assert (
-        outsider_download.status_code
-        == 404
-    )
+    assert outsider_download.status_code == 404

@@ -1,7 +1,8 @@
 from django.core.exceptions import ImproperlyConfigured
 
-from ..realtime import PRESENCE_GROUP, dialog_group, room_group, user_group
 from config import settings
+
+from ..realtime import PRESENCE_GROUP, dialog_group, room_group, user_group
 
 
 def test_realtime_group_names_are_stable() -> None:

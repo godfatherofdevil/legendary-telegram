@@ -43,15 +43,9 @@ def _deserialize_connection(raw_value: str) -> PresenceConnectionSnapshot:
         session_id=payload["session_id"],
         tab_id=payload["tab_id"],
         is_active=payload["is_active"],
-        last_interaction_at=timezone.datetime.fromisoformat(
-            payload["last_interaction_at"].replace("Z", "+00:00")
-        ),
-        last_heartbeat_at=timezone.datetime.fromisoformat(
-            payload["last_heartbeat_at"].replace("Z", "+00:00")
-        ),
-        connected_at=timezone.datetime.fromisoformat(
-            payload["connected_at"].replace("Z", "+00:00")
-        ),
+        last_interaction_at=timezone.datetime.fromisoformat(payload["last_interaction_at"].replace("Z", "+00:00")),
+        last_heartbeat_at=timezone.datetime.fromisoformat(payload["last_heartbeat_at"].replace("Z", "+00:00")),
+        connected_at=timezone.datetime.fromisoformat(payload["connected_at"].replace("Z", "+00:00")),
     )
 
 

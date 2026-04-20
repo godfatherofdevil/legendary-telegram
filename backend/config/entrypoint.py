@@ -43,9 +43,7 @@ def _get_command(env_name: str, default: Sequence[str]) -> list[str]:
 def main() -> None:
     _register_signal_handlers()
 
-    startup_exit_code = _run_command(
-        _get_command("BACKEND_STARTUP_COMMAND", [sys.executable, "-m", "config.startup"])
-    )
+    startup_exit_code = _run_command(_get_command("BACKEND_STARTUP_COMMAND", [sys.executable, "-m", "config.startup"]))
     if startup_exit_code != 0:
         raise SystemExit(startup_exit_code)
 

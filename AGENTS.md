@@ -186,6 +186,7 @@ Agents MUST:
 - keep authorization checks close to business actions
 - keep validation explicit and testable
 - keep websocket and REST behavior aligned where contract requires parity
+- respect the configured backend max line length in Python code and run the backend formatter when needed to keep lines within that limit
 
 Agents MUST NOT:
 

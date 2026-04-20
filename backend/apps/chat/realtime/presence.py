@@ -25,14 +25,10 @@ def compute_presence(*, connections: list[PresenceConnectionSnapshot], now) -> s
         return PresenceState.OFFLINE
 
     active_cutoff = now - AFK_TIMEOUT
-    if any(
-        connection.is_active or connection.last_interaction_at > active_cutoff
-        for connection in connections
-    ):
+    if any(connection.is_active or connection.last_interaction_at > active_cutoff for connection in connections):
         return PresenceState.ONLINE
     return PresenceState.AFK
 
 
 def serialize_timestamp(value) -> str:
     return value.isoformat().replace("+00:00", "Z")
-

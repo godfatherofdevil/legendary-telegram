@@ -1,8 +1,8 @@
 import logging
 
-from ..realtime.presence import PresenceConnectionSnapshot, compute_presence
 from ...common.enums import PresenceState
 from ...presence.models import UserPresenceConnection
+from ..realtime.presence import PresenceConnectionSnapshot, compute_presence
 
 logger = logging.getLogger(__name__)
 
@@ -33,9 +33,7 @@ def compare_presence_state_to_legacy_sql(*, user, redis_connections, now) -> lis
     if redis_presence != sql_presence:
         mismatches.append(f"presence mismatch redis={redis_presence} sql={sql_presence}")
     if len(redis_connections) != len(sql_snapshots):
-        mismatches.append(
-            f"connection count mismatch redis={len(redis_connections)} sql={len(sql_snapshots)}"
-        )
+        mismatches.append(f"connection count mismatch redis={len(redis_connections)} sql={len(sql_snapshots)}")
     if redis_presence not in {
         PresenceState.ONLINE,
         PresenceState.AFK,

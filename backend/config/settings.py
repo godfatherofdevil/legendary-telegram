@@ -23,21 +23,16 @@ def build_channel_layers(*, redis_url: str, allow_inmemory_fallback: bool) -> di
         }
     if allow_inmemory_fallback:
         return {"default": {"BACKEND": "channels.layers.InMemoryChannelLayer"}}
-    raise ImproperlyConfigured(
-        "REDIS_URL must be configured when in-memory channel layer fallback is disabled."
-    )
+    raise ImproperlyConfigured("REDIS_URL must be configured when in-memory channel layer fallback is disabled.")
+
 
 SECRET_KEY = os.environ.get("DJANGO_SECRET_KEY", LOCAL_DEV_SECRET_KEY)
 DEBUG = env_bool("DJANGO_DEBUG", True)
 ALLOWED_HOSTS = [
-    host.strip()
-    for host in os.environ.get("DJANGO_ALLOWED_HOSTS", "localhost,127.0.0.1").split(",")
-    if host.strip()
+    host.strip() for host in os.environ.get("DJANGO_ALLOWED_HOSTS", "localhost,127.0.0.1").split(",") if host.strip()
 ]
 CSRF_TRUSTED_ORIGINS = [
-    origin.strip()
-    for origin in os.environ.get("DJANGO_CSRF_TRUSTED_ORIGINS", "").split(",")
-    if origin.strip()
+    origin.strip() for origin in os.environ.get("DJANGO_CSRF_TRUSTED_ORIGINS", "").split(",") if origin.strip()
 ]
 CORS_ALLOWED_ORIGINS = [
     origin.strip()
@@ -118,12 +113,8 @@ CHANNEL_LAYERS = build_channel_layers(
     redis_url=REDIS_URL,
     allow_inmemory_fallback=ALLOW_INMEMORY_CHANNEL_LAYER,
 )
-CHAT_PRESENCE_HEARTBEAT_TTL_SECONDS = int(
-    os.environ.get("CHAT_PRESENCE_HEARTBEAT_TTL_SECONDS", "90")
-)
-CHAT_PRESENCE_SNAPSHOT_TTL_SECONDS = int(
-    os.environ.get("CHAT_PRESENCE_SNAPSHOT_TTL_SECONDS", "120")
-)
+CHAT_PRESENCE_HEARTBEAT_TTL_SECONDS = int(os.environ.get("CHAT_PRESENCE_HEARTBEAT_TTL_SECONDS", "90"))
+CHAT_PRESENCE_SNAPSHOT_TTL_SECONDS = int(os.environ.get("CHAT_PRESENCE_SNAPSHOT_TTL_SECONDS", "120"))
 CHAT_TYPING_TTL_SECONDS = int(os.environ.get("CHAT_TYPING_TTL_SECONDS", "15"))
 CHAT_MIGRATION_FLAGS = {
     "redis_presence_enabled": env_bool("CHAT_REDIS_PRESENCE_ENABLED", False),
@@ -132,9 +123,7 @@ CHAT_MIGRATION_FLAGS = {
     "async_persistence_enabled": env_bool("CHAT_ASYNC_PERSISTENCE_ENABLED", False),
     "legacy_sql_presence_enabled": env_bool("CHAT_LEGACY_SQL_PRESENCE_ENABLED", False),
     "legacy_sql_fanout_enabled": env_bool("CHAT_LEGACY_SQL_FANOUT_ENABLED", False),
-    "stream_fallback_to_sync_sql_enabled": env_bool(
-        "CHAT_STREAM_FALLBACK_TO_SYNC_SQL_ENABLED", False
-    ),
+    "stream_fallback_to_sync_sql_enabled": env_bool("CHAT_STREAM_FALLBACK_TO_SYNC_SQL_ENABLED", False),
     "parity_verification_enabled": env_bool("CHAT_PARITY_VERIFICATION_ENABLED", False),
 }
 

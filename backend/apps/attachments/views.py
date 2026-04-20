@@ -7,6 +7,7 @@ from rest_framework import status
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
+from ..common.api import error_response, success_response
 from .models import Attachment
 from .serializers import AttachmentUploadSerializer
 from .services import (
@@ -19,7 +20,6 @@ from .services import (
     serialize_attachment_metadata,
 )
 from .storage import AttachmentObjectNotFoundError, open_attachment_for_download
-from ..common.api import error_response, success_response
 
 STREAM_CHUNK_SIZE = 64 * 1024
 INLINE_CONTENT_TYPE_PREFIXES = ("image/", "video/", "audio/")
@@ -54,9 +54,7 @@ def _is_inline_media_content_type(content_type: str) -> bool:
     return content_type.startswith(INLINE_CONTENT_TYPE_PREFIXES)
 
 
-def _parse_single_range_header(
-    *, range_header: str | None, total_size: int
-) -> tuple[int, int] | None:
+def _parse_single_range_header(*, range_header: str | None, total_size: int) -> tuple[int, int] | None:
     if not range_header:
         return None
     if "," in range_header:
@@ -111,9 +109,7 @@ def _build_attachment_download_response(*, attachment, file_handle, byte_range: 
         filename=attachment.original_filename,
     )
     if is_partial:
-        response["Content-Range"] = (
-            f"bytes {range_start}-{range_end}/{attachment.size_bytes}"
-        )
+        response["Content-Range"] = f"bytes {range_start}-{range_end}/{attachment.size_bytes}"
     return response
 
 
@@ -142,11 +138,7 @@ class AttachmentListCreateView(APIView):
 
 class AttachmentDetailView(APIView):
     def get_object(self, attachment_id, user) -> Attachment:
-        attachment = (
-            Attachment.objects.select_related("uploaded_by_user")
-            .filter(id=attachment_id)
-            .first()
-        )
+        attachment = Attachment.objects.select_related("uploaded_by_user").filter(id=attachment_id).first()
         if attachment is None:
             raise Attachment.DoesNotExist
         require_attachment_access(attachment=attachment, user=user)

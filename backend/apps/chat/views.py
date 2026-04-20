@@ -5,6 +5,8 @@ from rest_framework import status
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
+from ..common.api import error_response, success_response
+from ..common.enums import ModerationActionType
 from .models import Room, RoomInvitation
 from .realtime import (
     force_room_unsubscribe,
@@ -80,8 +82,6 @@ from .services import (
     update_room,
     update_room_message,
 )
-from ..common.api import error_response, success_response
-from ..common.enums import ModerationActionType
 
 User = get_user_model()
 
@@ -138,9 +138,7 @@ class JoinedRoomListView(APIView):
     def get(self, request):
         memberships, unread_counts = list_joined_room_rows(user=request.user)
         payload = [
-            serialize_joined_room_item(
-                membership=membership, unread_count=unread_counts[membership.room_id]
-            )
+            serialize_joined_room_item(membership=membership, unread_count=unread_counts[membership.room_id])
             for membership in memberships
         ]
         return success_response(payload)
@@ -303,9 +301,7 @@ class RoomMemberListView(APIView):
         has_next = len(memberships) > page.limit
         return Response(
             {
-                "data": [
-                    serialize_room_member(membership) for membership in memberships[: page.limit]
-                ],
+                "data": [serialize_room_member(membership) for membership in memberships[: page.limit]],
                 "pagination": {
                     "next_cursor": encode_cursor(page.offset + page.limit) if has_next else None,
                     "limit": page.limit,
@@ -583,9 +579,7 @@ class DialogListCreateView(APIView):
         dialogs, unread_counts, last_messages = list_dialog_rows(user=request.user)
         payload = []
         for dialog in dialogs:
-            other_user = (
-                dialog.user_high if dialog.user_low_id == request.user.id else dialog.user_low
-            )
+            other_user = dialog.user_high if dialog.user_low_id == request.user.id else dialog.user_low
             payload.append(
                 serialize_dialog_summary(
                     dialog=dialog,
@@ -607,9 +601,7 @@ class DialogListCreateView(APIView):
                 status_code=status.HTTP_404_NOT_FOUND,
             )
         try:
-            dialog, created = get_or_create_dialog(
-                current_user=request.user, other_user=other_user
-            )
+            dialog, created = get_or_create_dialog(current_user=request.user, other_user=other_user)
         except DomainForbiddenError as exc:
             return error_response(
                 code="forbidden",
@@ -665,9 +657,7 @@ class RoomMessageListCreateView(APIView):
                 sender=request.user,
                 text=serializer.validated_data.get("text"),
                 reply_to_message_id=serializer.validated_data.get("reply_to_message_id"),
-                attachment_ids=[
-                    str(value) for value in serializer.validated_data.get("attachment_ids", [])
-                ],
+                attachment_ids=[str(value) for value in serializer.validated_data.get("attachment_ids", [])],
             )
         except Room.DoesNotExist:
             return error_response(
@@ -683,9 +673,7 @@ class RoomMessageListCreateView(APIView):
                 details={"message": [str(exc)]},
             )
         publish_room_message_created(message)
-        return success_response(
-            {"message": serialize_room_message(message)}, status.HTTP_201_CREATED
-        )
+        return success_response({"message": serialize_room_message(message)}, status.HTTP_201_CREATED)
 
 
 class RoomMessageDetailView(APIView):
@@ -768,9 +756,7 @@ class DialogMessageListCreateView(APIView):
                 max_limit=100,
             )
             dialog = get_dialog_for_user(dialog_id=dialog_id, user=request.user)
-            messages, has_next = list_dialog_message_rows(
-                dialog=dialog, user=request.user, page=page
-            )
+            messages, has_next = list_dialog_message_rows(dialog=dialog, user=request.user, page=page)
         except ValueError:
             return error_response(
                 code="validation_error",
@@ -806,9 +792,7 @@ class DialogMessageListCreateView(APIView):
                 sender=request.user,
                 text=serializer.validated_data.get("text"),
                 reply_to_message_id=serializer.validated_data.get("reply_to_message_id"),
-                attachment_ids=[
-                    str(value) for value in serializer.validated_data.get("attachment_ids", [])
-                ],
+                attachment_ids=[str(value) for value in serializer.validated_data.get("attachment_ids", [])],
             )
         except DomainForbiddenError as exc:
             return error_response(
@@ -833,9 +817,7 @@ class DialogMessageListCreateView(APIView):
             raise
         publish_dialog_message_created(message)
         publish_dialog_summary_updated(message.dialog, last_message=message)
-        return success_response(
-            {"message": serialize_dialog_message(message)}, status.HTTP_201_CREATED
-        )
+        return success_response({"message": serialize_dialog_message(message)}, status.HTTP_201_CREATED)
 
 
 class DialogMessageDetailView(APIView):

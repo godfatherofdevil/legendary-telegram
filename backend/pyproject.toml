@@ -4,7 +4,7 @@ pythonpath = ["."]
 testpaths = ["apps"]
 
 [tool.ruff]
-line-length = 100
+line-length = 120
 target-version = "py312"
 exclude = ["apps/*/migrations/*.py"]
 

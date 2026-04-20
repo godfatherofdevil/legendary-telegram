@@ -3,6 +3,10 @@ import asyncio
 from asgiref.sync import async_to_sync
 from channels.layers import get_channel_layer
 
+from ...social.serializers import (
+    serialize_friend_request_update,
+    serialize_incoming_friend_request,
+)
 from ..models import DialogMessage, RoomMessage
 from ..realtime.groups import PRESENCE_GROUP, dialog_group, room_group, user_group
 from ..realtime.serializers import build_broadcast_event, build_control_event
@@ -13,10 +17,6 @@ from ..serializers import (
     serialize_room_message,
 )
 from ..services import get_dialog_unread_count
-from ...social.serializers import (
-    serialize_friend_request_update,
-    serialize_incoming_friend_request,
-)
 
 
 def _dispatch_group_message(group_name: str, message: dict) -> None:

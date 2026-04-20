@@ -271,9 +271,21 @@ FRONTEND_PROXY_TARGET=http://backend:8000
 cp .env.example .env
 ```
 
-## 10.2 Start everything
+## 10.2 Install local dependencies
 
 From repository root:
+
+```bash
+make install
+```
+
+## 10.3 Start everything with Docker Compose
+
+```bash
+make stack-up
+```
+
+Equivalent raw command:
 
 ```bash
 docker compose up --build
@@ -288,18 +300,25 @@ The Compose stack also exposes explicit health checks:
 
 `frontend` waits for `backend` readiness before starting, and backend readiness verifies database connectivity plus local media directory availability for attachment storage.
 
-## 10.3 Verify services
+## 10.4 Verify services
 
 - Frontend: `http://localhost:3000`
 - Backend admin route: `http://localhost:8000/admin/`
 
-## 10.4 Backend test workflow
+## 10.5 Common development targets
 
-From `backend/`:
+From repository root:
 
 ```bash
-python -m pytest
-ruff check .
+make help
+make backend-test
+make frontend-test
+make lint
+make backend-local
+make frontend-local
+make infra-up
+make backend-compose
+make frontend-compose
 ```
 
 ### Expected local URLs
@@ -309,27 +328,31 @@ ruff check .
 
 ---
 
-## 10.2 Start infrastructure only
+## 10.6 Start infrastructure only
 
 ```bash
-docker compose up -d postgres redis
+make infra-up
 ```
 
 ---
 
-## 10.3 Start backend only
+## 10.7 Run backend locally
 
 ```bash
-docker compose up backend
+make backend-local
 ```
+
+This host-local workflow uses the repository `.venv` and auto-exports `.local/.env` before startup when it exists. It otherwise falls back to Django's local defaults, SQLite when `DATABASE_URL` is unset, and the in-memory Channels layer while `DJANGO_DEBUG=1`.
 
 ---
 
-## 10.4 Start frontend only
+## 10.8 Run frontend locally
 
 ```bash
-docker compose up frontend
+make frontend-local
 ```
+
+The target auto-exports `.local/.env` before startup so Vite can resolve local frontend variables even though it runs from `frontend/`. It also forces the proxy fallback to `http://127.0.0.1:8000` so it works against a host-local backend without requiring Docker service DNS names. Frontend Vite entrypoints also preload a small Node compatibility shim so `structuredClone` is available on older local Node runtimes.
 
 ---
 
@@ -350,36 +373,44 @@ Create `.env` from `.env.example`.
 
 ### Step 3
 
-Bring up infrastructure:
+Install dependencies:
 
 ```bash
-docker compose up -d postgres redis
+make install
 ```
 
 ### Step 4
 
-Run backend:
+Choose one backend workflow:
 
 ```bash
-docker compose up backend
+make backend-local
 ```
 
 ### Step 5
 
-Run frontend:
+Choose one frontend workflow:
 
 ```bash
-docker compose up frontend
+make frontend-local
 ```
 
 ### Step 6
+
+If you want the full containerized stack instead:
+
+```bash
+make stack-up
+```
+
+### Step 7
 
 Verify:
 
 * frontend loads
 * backend API responds
-* backend can connect to postgres
-* backend can connect to redis
+* when using Docker Compose, backend can connect to postgres
+* when using Docker Compose, backend can connect to redis
 * WebSocket endpoint is reachable
 
 ---
@@ -399,9 +430,11 @@ Expected responsibilities include:
 Typical backend commands:
 
 ```bash
-docker compose run --rm backend python manage.py migrate
-docker compose run --rm backend python manage.py createsuperuser
-docker compose run --rm backend python manage.py test
+make backend-migrate
+make backend-test
+make backend-lint
+make backend-lint-fix
+make backend-format
 ```
 
 ---
@@ -421,15 +454,14 @@ Expected responsibilities include:
 * auth pages
 * rooms/dialogs UI
 
-Typical frontend commands inside containerized workflow are driven by Docker Compose.
-
-If running locally outside Docker, typical commands are:
+Typical frontend commands:
 
 ```bash
-npm install
-npm run dev
-npm run build
-npm run test
+make frontend-install
+make frontend-local
+make frontend-test
+make frontend-lint
+make frontend-lint-fix
 ```
 
 ---
@@ -441,13 +473,7 @@ npm run test
 Run backend tests:
 
 ```bash
-docker compose run --rm backend python manage.py test
-```
-
-If pytest is used instead:
-
-```bash
-docker compose run --rm backend pytest
+make backend-test
 ```
 
 ## 14.2 Frontend tests
@@ -455,7 +481,7 @@ docker compose run --rm backend pytest
 Run frontend tests:
 
 ```bash
-docker compose run --rm frontend npm test
+make frontend-test
 ```
 
 ## 14.3 Contract verification
@@ -526,37 +552,37 @@ The local setup is considered healthy only if all of the following are true:
 ## 18.1 Build all services
 
 ```bash
-docker compose build
+make stack-build
 ```
 
 ## 18.2 Start all services
 
 ```bash
-docker compose up
+make stack-up
 ```
 
 ## 18.3 Start all services detached
 
 ```bash
-docker compose up -d
+make stack-up-detached
 ```
 
 ## 18.4 Stop all services
 
 ```bash
-docker compose down
+make stack-down
 ```
 
 ## 18.5 Stop and remove volumes
 
 ```bash
-docker compose down -v
+make stack-down-volumes
 ```
 
 ## 18.6 View logs
 
 ```bash
-docker compose logs -f
+make stack-logs
 ```
 
 ## 18.7 View backend logs

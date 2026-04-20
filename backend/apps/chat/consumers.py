@@ -8,6 +8,7 @@ from django.contrib.sessions.models import Session
 from django.http.cookie import parse_cookie
 from rest_framework import serializers
 
+from ..presence.services import close_presence_connection, upsert_presence_connection
 from .models import Dialog, Room
 from .realtime import (
     PRESENCE_GROUP,
@@ -45,7 +46,6 @@ from .ws_serializers import (
     RoomReadSerializer,
     RoomSubscriptionSerializer,
 )
-from ..presence.services import close_presence_connection, upsert_presence_connection
 
 User = get_user_model()
 os.environ.setdefault("DJANGO_ALLOW_ASYNC_UNSAFE", "true")
@@ -248,8 +248,7 @@ class ChatConsumer(AsyncJsonWebsocketConsumer):
             text=serializer.validated_data.get("text"),
             reply_to_message_id=serializer.validated_data.get("reply_to_message_id"),
             attachment_ids=[
-                str(attachment_id)
-                for attachment_id in serializer.validated_data.get("attachment_ids", [])
+                str(attachment_id) for attachment_id in serializer.validated_data.get("attachment_ids", [])
             ],
         )
         await self._send_ack(request_id)
@@ -273,8 +272,7 @@ class ChatConsumer(AsyncJsonWebsocketConsumer):
             text=serializer.validated_data.get("text"),
             reply_to_message_id=serializer.validated_data.get("reply_to_message_id"),
             attachment_ids=[
-                str(attachment_id)
-                for attachment_id in serializer.validated_data.get("attachment_ids", [])
+                str(attachment_id) for attachment_id in serializer.validated_data.get("attachment_ids", [])
             ],
         )
         await self._send_ack(request_id)

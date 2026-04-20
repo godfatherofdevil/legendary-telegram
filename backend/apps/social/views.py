@@ -174,9 +174,7 @@ class FriendDetailView(APIView):
 
 class PeerBanListCreateView(APIView):
     def get(self, request):
-        return success_response(
-            [serialize_peer_ban(item) for item in list_peer_bans(user=request.user)]
-        )
+        return success_response([serialize_peer_ban(item) for item in list_peer_bans(user=request.user)])
 
     def post(self, request):
         serializer = PeerBanCreateSerializer(data=request.data)

@@ -7,9 +7,9 @@ from django.contrib.auth import get_user_model
 from django.test import override_settings
 from django.utils import timezone
 
-from ...infrastructure.redis.client import get_redis_connection
 from ....presence.models import UserPresenceConnection
 from ....presence.services import get_presence_snapshots, upsert_presence_connection
+from ...infrastructure.redis.client import get_redis_connection
 
 User = get_user_model()
 

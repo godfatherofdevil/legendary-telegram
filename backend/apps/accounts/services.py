@@ -17,11 +17,11 @@ from django.db import transaction
 from django.db.models import Q
 from django.utils import timezone
 
-from .models import PasswordResetToken, UserSession
 from ..attachments.models import Attachment
 from ..audit.models import ModerationEvent
 from ..chat.models import Room
 from ..common.enums import ModerationActionType
+from .models import PasswordResetToken, UserSession
 
 logger = logging.getLogger(__name__)
 User = get_user_model()
@@ -233,9 +233,7 @@ def delete_account(*, user) -> None:
         .values_list("id", flat=True)
         .distinct()
     )
-    user_attachment_ids = list(
-        Attachment.objects.filter(uploaded_by_user=user).values_list("id", flat=True)
-    )
+    user_attachment_ids = list(Attachment.objects.filter(uploaded_by_user=user).values_list("id", flat=True))
 
     if room_attachment_ids:
         Attachment.objects.filter(id__in=room_attachment_ids).delete()
@@ -257,6 +255,4 @@ def delete_account(*, user) -> None:
 
 def cleanup_expired_session_records() -> None:
     now = timezone.now()
-    UserSession.objects.filter(Q(expires_at__lte=now) | Q(revoked_at__isnull=False)).update(
-        is_currently_valid=False
-    )
+    UserSession.objects.filter(Q(expires_at__lte=now) | Q(revoked_at__isnull=False)).update(is_currently_valid=False)

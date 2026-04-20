@@ -1,6 +1,6 @@
 import asyncio
-import os
 import json
+import os
 from datetime import timedelta
 from importlib import import_module
 
@@ -8,16 +8,16 @@ import pytest
 from asgiref.sync import async_to_sync
 from channels.testing import WebsocketCommunicator
 from django.conf import settings
-from django.contrib.auth import BACKEND_SESSION_KEY, HASH_SESSION_KEY, SESSION_KEY
-from django.contrib.auth import get_user_model
+from django.contrib.auth import BACKEND_SESSION_KEY, HASH_SESSION_KEY, SESSION_KEY, get_user_model
 from django.test import Client
 from django.urls import reverse
 from django.utils import timezone
 
-from ..models import Dialog, Room, RoomMembership
+from config.asgi import application
+
 from ...common.enums import RoomRole, RoomVisibility
 from ...social.models import Friendship
-from config.asgi import application
+from ..models import Dialog, Room, RoomMembership
 
 User = get_user_model()
 os.environ.setdefault("DJANGO_ALLOW_ASYNC_UNSAFE", "true")

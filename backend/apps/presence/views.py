@@ -10,9 +10,7 @@ class PresenceQueryView(APIView):
     def post(self, request):
         serializer = PresenceQuerySerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
-        return success_response(
-            get_presence_snapshots(user_ids=serializer.validated_data["user_ids"])
-        )
+        return success_response(get_presence_snapshots(user_ids=serializer.validated_data["user_ids"]))
 
 
 class NotificationSummaryView(APIView):

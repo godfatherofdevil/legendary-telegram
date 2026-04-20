@@ -12,4 +12,3 @@ def presence_connection_key(connection_key: str) -> str:
 
 def typing_key(*, chat_type: str, chat_id, user_id) -> str:
     return f"typing:{chat_type}:{chat_id}:{user_id}"
-

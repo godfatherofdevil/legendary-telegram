@@ -18,8 +18,8 @@ from ..chat.realtime.connection_registry import (
 )
 from ..chat.realtime.presence import compute_presence, serialize_timestamp
 from ..common.enums import FriendRequestStatus
-from .models import UserPresenceConnection
 from ..social.models import FriendRequest
+from .models import UserPresenceConnection
 
 User = get_user_model()
 
@@ -70,9 +70,7 @@ def recompute_user_presence(*, user: User, now=None) -> tuple[str, timezone.date
         if computed_presence != locked_user.presence_state:
             locked_user.presence_state = computed_presence
             locked_user.presence_last_changed_at = current_time
-            locked_user.save(
-                update_fields=["presence_state", "presence_last_changed_at", "updated_at"]
-            )
+            locked_user.save(update_fields=["presence_state", "presence_last_changed_at", "updated_at"])
             last_changed_at = current_time
         write_presence_snapshot(
             user_id=locked_user.id,
@@ -105,10 +103,7 @@ def get_presence_snapshots(*, user_ids: Iterable[str]) -> list[dict[str, str]]:
     if not requested_ids:
         return []
 
-    users = {
-        str(user.id): user
-        for user in User.objects.filter(id__in=requested_ids).order_by("id")
-    }
+    users = {str(user.id): user for user in User.objects.filter(id__in=requested_ids).order_by("id")}
 
     payload = []
     for user_id in requested_ids:
