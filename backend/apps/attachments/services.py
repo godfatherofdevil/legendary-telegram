@@ -8,10 +8,10 @@ from django.core.files.uploadedfile import UploadedFile
 from django.db import transaction
 
 from ..accounts.serializers import serialize_public_user
-from .models import Attachment, DialogMessageAttachment, RoomMessageAttachment
-from .storage import delete_attachment_from_storage, get_attachment_storage
 from ..chat.models import RoomBan, RoomMembership
 from ..common.enums import AttachmentBindingType
+from .models import Attachment, DialogMessageAttachment, RoomMessageAttachment
+from .storage import delete_attachment_from_storage, get_attachment_storage
 
 User = get_user_model()
 
@@ -91,9 +91,7 @@ def require_attachment_access(*, attachment: Attachment, user: User) -> None:
 
     if attachment.binding_type == AttachmentBindingType.ROOM_MESSAGE:
         binding = (
-            RoomMessageAttachment.objects.select_related("room_message__room")
-            .filter(attachment=attachment)
-            .first()
+            RoomMessageAttachment.objects.select_related("room_message__room").filter(attachment=attachment).first()
         )
         if binding is None:
             raise Attachment.DoesNotExist
@@ -121,9 +119,7 @@ def require_attachment_access(*, attachment: Attachment, user: User) -> None:
 
 
 @transaction.atomic
-def create_attachment(
-    *, uploaded_by_user: User, uploaded_file: UploadedFile, comment: str | None
-) -> Attachment:
+def create_attachment(*, uploaded_by_user: User, uploaded_file: UploadedFile, comment: str | None) -> Attachment:
     size_bytes, content_type = _validate_uploaded_file(uploaded_file)
     original_filename = os.path.basename(uploaded_file.name)
     storage_key = _build_storage_key(original_filename)

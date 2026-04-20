@@ -78,8 +78,7 @@ def test_run_startup_migrations_does_not_hide_other_inconsistencies(monkeypatch)
         "_run_migrate",
         lambda: (_ for _ in ()).throw(
             InconsistentMigrationHistory(
-                "Migration chat.0002_example is applied before its dependency chat.0001_initial "
-                "on database 'default'."
+                "Migration chat.0002_example is applied before its dependency chat.0001_initial on database 'default'."
             )
         ),
     )

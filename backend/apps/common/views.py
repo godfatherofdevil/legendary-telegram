@@ -35,11 +35,7 @@ def ready_view(_request):
         checks["database"] = "error"
 
     redis_ok = checks.get("redis_reachable", "ok") == "ok"
-    status_code = (
-        200
-        if checks["database"] == "ok" and attachment_storage_ok and redis_ok
-        else 503
-    )
+    status_code = 200 if checks["database"] == "ok" and attachment_storage_ok and redis_ok else 503
     return JsonResponse(
         {
             "status": "ok" if status_code == 200 else "error",

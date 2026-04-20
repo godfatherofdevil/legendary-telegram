@@ -21,8 +21,8 @@ from .views import (
     RoomMemberListView,
     RoomMessageDetailView,
     RoomMessageListCreateView,
-    RoomRemoveMemberView,
     RoomReadView,
+    RoomRemoveMemberView,
 )
 
 urlpatterns = [

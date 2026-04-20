@@ -9,8 +9,7 @@ from django.db import connections
 from django.db.migrations.exceptions import InconsistentMigrationHistory
 
 KNOWN_ADMIN_ACCOUNTS_INCONSISTENCY = (
-    "Migration admin.0001_initial is applied before its dependency "
-    "accounts.0001_initial on database 'default'."
+    "Migration admin.0001_initial is applied before its dependency accounts.0001_initial on database 'default'."
 )
 
 
@@ -44,9 +43,7 @@ def run_attachment_storage_backfill_on_startup() -> None:
 
 
 def should_reset_inconsistent_history(exc: InconsistentMigrationHistory) -> bool:
-    return env_bool("DJANGO_RESET_INCONSISTENT_MIGRATIONS", False) and (
-        KNOWN_ADMIN_ACCOUNTS_INCONSISTENCY in str(exc)
-    )
+    return env_bool("DJANGO_RESET_INCONSISTENT_MIGRATIONS", False) and (KNOWN_ADMIN_ACCOUNTS_INCONSISTENCY in str(exc))
 
 
 def reset_default_database() -> None:
@@ -61,9 +58,7 @@ def reset_default_database() -> None:
         reset_sqlite_database(connection.settings_dict)
         return
 
-    raise RuntimeError(
-        f"Unsupported database engine for inconsistent migration recovery: {engine}"
-    )
+    raise RuntimeError(f"Unsupported database engine for inconsistent migration recovery: {engine}")
 
 
 def reset_postgresql_schema(connection) -> None:
@@ -94,14 +89,10 @@ def validate_runtime_configuration() -> None:
         return
 
     if not settings.SECRET_KEY or settings.SECRET_KEY == settings.LOCAL_DEV_SECRET_KEY:
-        raise ImproperlyConfigured(
-            "DJANGO_SECRET_KEY must be set to a non-default value when DJANGO_DEBUG=0."
-        )
+        raise ImproperlyConfigured("DJANGO_SECRET_KEY must be set to a non-default value when DJANGO_DEBUG=0.")
 
     if not settings.ALLOWED_HOSTS:
-        raise ImproperlyConfigured(
-            "DJANGO_ALLOWED_HOSTS must include at least one host when DJANGO_DEBUG=0."
-        )
+        raise ImproperlyConfigured("DJANGO_ALLOWED_HOSTS must include at least one host when DJANGO_DEBUG=0.")
 
     if not settings.REDIS_URL:
         raise ImproperlyConfigured(

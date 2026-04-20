@@ -8,8 +8,8 @@ from rest_framework.test import APIClient
 
 from ...chat.models import Dialog, DialogMessage, Room, RoomMembership, RoomMessage
 from ...common.enums import FriendRequestStatus, PresenceState, RoomRole, RoomVisibility
-from ..models import UserPresenceConnection
 from ...social.models import FriendRequest, Friendship
+from ..models import UserPresenceConnection
 
 User = get_user_model()
 
@@ -101,9 +101,7 @@ def test_presence_query_returns_computed_values_for_multiple_users(api_client: A
         {
             "user_id": str(online_user.id),
             "presence": "online",
-            "last_changed_at": online_user.presence_last_changed_at.isoformat().replace(
-                "+00:00", "Z"
-            ),
+            "last_changed_at": online_user.presence_last_changed_at.isoformat().replace("+00:00", "Z"),
         },
         {
             "user_id": str(afk_user.id),
@@ -113,9 +111,7 @@ def test_presence_query_returns_computed_values_for_multiple_users(api_client: A
         {
             "user_id": str(offline_user.id),
             "presence": "offline",
-            "last_changed_at": offline_user.presence_last_changed_at.isoformat().replace(
-                "+00:00", "Z"
-            ),
+            "last_changed_at": offline_user.presence_last_changed_at.isoformat().replace("+00:00", "Z"),
         },
     ]
     afk_user.refresh_from_db()

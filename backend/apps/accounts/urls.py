@@ -9,9 +9,9 @@ from .views import (
     RegisterView,
     RequestPasswordResetView,
     ResetPasswordView,
-    SessionStatusView,
     SessionDetailView,
     SessionListView,
+    SessionStatusView,
     UserByUsernameView,
     UserProfileView,
 )

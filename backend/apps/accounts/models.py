@@ -93,9 +93,7 @@ class User(AbstractBaseUser, PermissionsMixin, TimestampedModel):
             raise ValidationError({"email": "Email must not be empty."})
 
         if self.pk:
-            current_username = (
-                self.__class__.objects.filter(pk=self.pk).values_list("username", flat=True).first()
-            )
+            current_username = self.__class__.objects.filter(pk=self.pk).values_list("username", flat=True).first()
             if current_username and current_username != self.username:
                 raise ValidationError({"username": "Username is immutable."})
 

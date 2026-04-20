@@ -14,6 +14,8 @@ from ..attachments.services import (
     delete_room_message_attachments,
 )
 from ..audit.models import ModerationEvent
+from ..common.enums import AttachmentBindingType, ModerationActionType, RoomRole, RoomVisibility
+from ..social.models import Friendship, PeerBan
 from .models import (
     Dialog,
     DialogMessage,
@@ -25,8 +27,6 @@ from .models import (
     RoomMessage,
     RoomReadState,
 )
-from ..common.enums import AttachmentBindingType, ModerationActionType, RoomRole, RoomVisibility
-from ..social.models import Friendship, PeerBan
 
 User = get_user_model()
 MESSAGE_TEXT_LIMIT_BYTES = 3 * 1024
@@ -69,9 +69,7 @@ def decode_cursor(raw_cursor: str | None) -> int:
     return offset
 
 
-def get_page_window(
-    *, raw_limit: str | None, raw_cursor: str | None, default_limit: int, max_limit: int
-) -> PageWindow:
+def get_page_window(*, raw_limit: str | None, raw_cursor: str | None, default_limit: int, max_limit: int) -> PageWindow:
     limit = default_limit
     if raw_limit is not None:
         try:
@@ -97,9 +95,7 @@ def is_room_member(*, room: Room, user: User) -> bool:
 
 
 def get_user_room_role(*, room: Room, user: User) -> str:
-    membership = (
-        RoomMembership.objects.filter(room=room, user=user).values_list("role", flat=True).first()
-    )
+    membership = RoomMembership.objects.filter(room=room, user=user).values_list("role", flat=True).first()
     return membership or "none"
 
 
@@ -169,9 +165,7 @@ def _lock_owned_unbound_attachments(*, user: User, attachment_ids: list[str]) ->
     deduped_ids = list(dict.fromkeys(str(attachment_id) for attachment_id in attachment_ids))
     if len(deduped_ids) != len(attachment_ids):
         raise DomainValidationError("Attachment ids must be unique.")
-    attachments = list(
-        Attachment.objects.select_for_update().filter(id__in=deduped_ids, deleted_at__isnull=True)
-    )
+    attachments = list(Attachment.objects.select_for_update().filter(id__in=deduped_ids, deleted_at__isnull=True))
     if len(attachments) != len(deduped_ids):
         raise DomainValidationError("One or more attachments are invalid.")
     attachments_by_id = {str(attachment.id): attachment for attachment in attachments}
@@ -191,9 +185,7 @@ def _room_message_prefetch():
     ).prefetch_related(
         Prefetch(
             "attachment_bindings",
-            queryset=RoomMessageAttachment.objects.select_related("attachment").order_by(
-                "created_at", "id"
-            ),
+            queryset=RoomMessageAttachment.objects.select_related("attachment").order_by("created_at", "id"),
         )
     )
 
@@ -205,9 +197,7 @@ def _dialog_message_prefetch():
     ).prefetch_related(
         Prefetch(
             "attachment_bindings",
-            queryset=DialogMessageAttachment.objects.select_related("attachment").order_by(
-                "created_at", "id"
-            ),
+            queryset=DialogMessageAttachment.objects.select_related("attachment").order_by("created_at", "id"),
         )
     )
 
@@ -276,9 +266,7 @@ def join_room(*, room: Room, user: User) -> None:
         raise DomainForbiddenError("You are banned from this room.")
     if RoomMembership.objects.filter(room=room, user=user).exists():
         raise DomainConflictError("You are already a member of this room.")
-    RoomMembership.objects.create(
-        room=room, user=user, role=RoomRole.MEMBER, joined_at=timezone.now()
-    )
+    RoomMembership.objects.create(room=room, user=user, role=RoomRole.MEMBER, joined_at=timezone.now())
 
 
 @transaction.atomic
@@ -296,9 +284,7 @@ def list_public_rooms(*, search: str | None):
     queryset = Room.objects.filter(visibility=RoomVisibility.PUBLIC).select_related("owner_user")
     if search:
         queryset = queryset.filter(name__icontains=search.strip())
-    return queryset.annotate(member_count=Count("memberships", distinct=True)).order_by(
-        "name", "id"
-    )
+    return queryset.annotate(member_count=Count("memberships", distinct=True)).order_by("name", "id")
 
 
 def list_joined_room_rows(*, user: User):
@@ -311,9 +297,7 @@ def list_joined_room_rows(*, user: User):
     room_ids = [membership.room_id for membership in memberships]
     read_states = {
         item["room_id"]: item["last_read_at"]
-        for item in RoomReadState.objects.filter(room_id__in=room_ids, user=user).values(
-            "room_id", "last_read_at"
-        )
+        for item in RoomReadState.objects.filter(room_id__in=room_ids, user=user).values("room_id", "last_read_at")
     }
     unread_counts = {room_id: 0 for room_id in room_ids}
     for message in (
@@ -337,9 +321,7 @@ def list_room_members(*, room: Room):
         RoomRole.ADMIN: 1,
         RoomRole.MEMBER: 2,
     }
-    memberships.sort(
-        key=lambda item: (role_order[item.role], item.user.username, str(item.user.id))
-    )
+    memberships.sort(key=lambda item: (role_order[item.role], item.user.username, str(item.user.id)))
     return memberships
 
 
@@ -417,9 +399,7 @@ def reject_room_invitation(*, invitation_id, actor: User) -> None:
 @transaction.atomic
 def promote_room_admin(*, room: Room, actor: User, target_user: User) -> None:
     require_room_owner(room=room, user=actor)
-    membership = (
-        RoomMembership.objects.select_for_update().filter(room=room, user=target_user).first()
-    )
+    membership = RoomMembership.objects.select_for_update().filter(room=room, user=target_user).first()
     if membership is None:
         raise RoomMembership.DoesNotExist
     if membership.role == RoomRole.OWNER:
@@ -439,9 +419,7 @@ def promote_room_admin(*, room: Room, actor: User, target_user: User) -> None:
 @transaction.atomic
 def demote_room_admin(*, room: Room, actor: User, target_user: User) -> None:
     actor_role = require_room_admin_or_owner(room=room, user=actor)
-    membership = (
-        RoomMembership.objects.select_for_update().filter(room=room, user=target_user).first()
-    )
+    membership = RoomMembership.objects.select_for_update().filter(room=room, user=target_user).first()
     if membership is None:
         raise RoomMembership.DoesNotExist
     if membership.role == RoomRole.OWNER:
@@ -462,9 +440,7 @@ def demote_room_admin(*, room: Room, actor: User, target_user: User) -> None:
 
 def _get_room_member_for_moderation(*, room: Room, actor: User, target_user: User) -> RoomMembership:
     actor_role = require_room_admin_or_owner(room=room, user=actor)
-    membership = (
-        RoomMembership.objects.select_for_update().filter(room=room, user=target_user).first()
-    )
+    membership = RoomMembership.objects.select_for_update().filter(room=room, user=target_user).first()
     if membership is None:
         raise RoomMembership.DoesNotExist
     if membership.role == RoomRole.OWNER:
@@ -513,11 +489,7 @@ def list_room_bans(*, room: Room, actor: User):
 @transaction.atomic
 def remove_room_ban(*, room: Room, actor: User, target_user: User) -> None:
     require_room_admin_or_owner(room=room, user=actor)
-    ban = (
-        RoomBan.objects.select_for_update()
-        .filter(room=room, user=target_user, removed_at__isnull=True)
-        .first()
-    )
+    ban = RoomBan.objects.select_for_update().filter(room=room, user=target_user, removed_at__isnull=True).first()
     if ban is None:
         raise RoomBan.DoesNotExist
     ban.removed_at = timezone.now()
@@ -598,9 +570,7 @@ def get_dialog_unread_count(*, dialog: Dialog, user: User) -> int:
     if dialog.user_low_id != user.id and dialog.user_high_id != user.id:
         raise Dialog.DoesNotExist
     last_read_at = (
-        DialogReadState.objects.filter(dialog=dialog, user=user)
-        .values_list("last_read_at", flat=True)
-        .first()
+        DialogReadState.objects.filter(dialog=dialog, user=user).values_list("last_read_at", flat=True).first()
     )
     queryset = DialogMessage.objects.filter(dialog=dialog).exclude(sender_user=user)
     if last_read_at is not None:
@@ -608,9 +578,7 @@ def get_dialog_unread_count(*, dialog: Dialog, user: User) -> int:
     return queryset.count()
 
 
-def list_room_message_rows(
-    *, room: Room, user: User, page: PageWindow
-) -> tuple[list[RoomMessage], bool]:
+def list_room_message_rows(*, room: Room, user: User, page: PageWindow) -> tuple[list[RoomMessage], bool]:
     require_room_message_access(room=room, user=user)
     messages = list(
         _room_message_prefetch()
@@ -622,9 +590,7 @@ def list_room_message_rows(
     return page_items, has_next
 
 
-def list_dialog_message_rows(
-    *, dialog: Dialog, user: User, page: PageWindow
-) -> tuple[list[DialogMessage], bool]:
+def list_dialog_message_rows(*, dialog: Dialog, user: User, page: PageWindow) -> tuple[list[DialogMessage], bool]:
     if dialog.user_low_id != user.id and dialog.user_high_id != user.id:
         raise Dialog.DoesNotExist
     messages = list(
@@ -641,9 +607,7 @@ def _get_room_reply_message(*, room: Room, reply_to_message_id) -> RoomMessage |
     if reply_to_message_id is None:
         return None
     reply_to_message = (
-        RoomMessage.objects.select_related("sender_user")
-        .filter(id=reply_to_message_id, room=room)
-        .first()
+        RoomMessage.objects.select_related("sender_user").filter(id=reply_to_message_id, room=room).first()
     )
     if reply_to_message is None:
         raise DomainValidationError("Reply target must belong to the same room.")
@@ -654,9 +618,7 @@ def _get_dialog_reply_message(*, dialog: Dialog, reply_to_message_id) -> DialogM
     if reply_to_message_id is None:
         return None
     reply_to_message = (
-        DialogMessage.objects.select_related("sender_user")
-        .filter(id=reply_to_message_id, dialog=dialog)
-        .first()
+        DialogMessage.objects.select_related("sender_user").filter(id=reply_to_message_id, dialog=dialog).first()
     )
     if reply_to_message is None:
         raise DomainValidationError("Reply target must belong to the same dialog.")
@@ -684,10 +646,7 @@ def create_room_message(
     )
     if attachments:
         RoomMessageAttachment.objects.bulk_create(
-            [
-                RoomMessageAttachment(room_message=message, attachment=attachment)
-                for attachment in attachments
-            ]
+            [RoomMessageAttachment(room_message=message, attachment=attachment) for attachment in attachments]
         )
         Attachment.objects.filter(id__in=[attachment.id for attachment in attachments]).update(
             binding_type=AttachmentBindingType.ROOM_MESSAGE,
@@ -751,14 +710,10 @@ def create_dialog_message(
     if dialog.is_frozen:
         raise DomainForbiddenError("You are not allowed to send messages to this dialog.")
     other_user = dialog.user_high if dialog.user_low_id == sender.id else dialog.user_low
-    if not are_friends(user_a=sender, user_b=other_user) or has_active_peer_ban(
-        user_a=sender, user_b=other_user
-    ):
+    if not are_friends(user_a=sender, user_b=other_user) or has_active_peer_ban(user_a=sender, user_b=other_user):
         raise DomainForbiddenError("You are not allowed to send messages to this dialog.")
     text = _validate_message_content(text=text, attachment_ids=attachment_ids)
-    reply_to_message = _get_dialog_reply_message(
-        dialog=dialog, reply_to_message_id=reply_to_message_id
-    )
+    reply_to_message = _get_dialog_reply_message(dialog=dialog, reply_to_message_id=reply_to_message_id)
     attachments = _lock_owned_unbound_attachments(user=sender, attachment_ids=attachment_ids)
     message = DialogMessage.objects.create(
         dialog=dialog,
@@ -768,10 +723,7 @@ def create_dialog_message(
     )
     if attachments:
         DialogMessageAttachment.objects.bulk_create(
-            [
-                DialogMessageAttachment(dialog_message=message, attachment=attachment)
-                for attachment in attachments
-            ]
+            [DialogMessageAttachment(dialog_message=message, attachment=attachment) for attachment in attachments]
         )
         Attachment.objects.filter(id__in=[attachment.id for attachment in attachments]).update(
             binding_type=AttachmentBindingType.DIALOG_MESSAGE,
@@ -782,9 +734,7 @@ def create_dialog_message(
 
 
 @transaction.atomic
-def update_dialog_message(
-    *, dialog: Dialog, message_id, actor: User, text: str | None
-) -> DialogMessage:
+def update_dialog_message(*, dialog: Dialog, message_id, actor: User, text: str | None) -> DialogMessage:
     if dialog.user_low_id != actor.id and dialog.user_high_id != actor.id:
         raise Dialog.DoesNotExist
     message = DialogMessage.objects.select_for_update().filter(id=message_id, dialog=dialog).first()
@@ -838,9 +788,7 @@ def mark_room_read(*, room: Room, user: User) -> None:
 def mark_dialog_read(*, dialog: Dialog, user: User) -> None:
     if dialog.user_low_id != user.id and dialog.user_high_id != user.id:
         raise Dialog.DoesNotExist
-    latest_message = (
-        DialogMessage.objects.filter(dialog=dialog).order_by("-created_at", "-id").first()
-    )
+    latest_message = DialogMessage.objects.filter(dialog=dialog).order_by("-created_at", "-id").first()
     defaults = {
         "last_read_dialog_message": latest_message,
         "last_read_at": latest_message.created_at if latest_message is not None else timezone.now(),

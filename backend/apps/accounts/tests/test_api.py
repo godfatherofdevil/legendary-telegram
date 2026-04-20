@@ -6,10 +6,10 @@ from django.test import override_settings
 from django.urls import reverse
 from rest_framework.test import APIClient
 
-from ..models import PasswordResetToken, UserSession
 from ...attachments.models import Attachment, RoomMessageAttachment
 from ...chat.models import Room, RoomMembership, RoomMessage
 from ...common.enums import RoomRole, RoomVisibility
+from ..models import PasswordResetToken, UserSession
 
 User = get_user_model()
 

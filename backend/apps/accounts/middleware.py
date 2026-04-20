@@ -7,10 +7,6 @@ class SessionTrackingMiddleware:
 
     def __call__(self, request):
         response = self.get_response(request)
-        if (
-            getattr(request, "user", None)
-            and request.user.is_authenticated
-            and request.session.session_key
-        ):
+        if getattr(request, "user", None) and request.user.is_authenticated and request.session.session_key:
             sync_session_record(request)
         return response

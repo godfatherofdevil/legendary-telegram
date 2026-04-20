@@ -7,6 +7,8 @@ from django.utils import timezone
 from rest_framework.test import APIClient
 
 from ...attachments.models import Attachment, DialogMessageAttachment, RoomMessageAttachment
+from ...common.enums import AttachmentBindingType, RoomRole, RoomVisibility
+from ...social.models import Friendship, PeerBan
 from ..models import (
     Dialog,
     DialogMessage,
@@ -18,8 +20,6 @@ from ..models import (
     RoomReadState,
 )
 from ..services import PageWindow, list_dialog_rows, list_room_message_rows
-from ...common.enums import AttachmentBindingType, RoomRole, RoomVisibility
-from ...social.models import Friendship, PeerBan
 
 User = get_user_model()
 
@@ -61,9 +61,7 @@ def test_user_profile_endpoints_expose_only_public_fields(api_client: APIClient)
     api_client.force_login(requester)
 
     by_id_response = api_client.get(reverse("user-profile", kwargs={"user_id": target.id}))
-    by_username_response = api_client.get(
-        reverse("user-by-username", kwargs={"username": target.username})
-    )
+    by_username_response = api_client.get(reverse("user-by-username", kwargs={"username": target.username}))
 
     assert by_id_response.status_code == 200
     assert by_username_response.status_code == 200
@@ -99,9 +97,7 @@ def test_joined_room_list_includes_unread_counts(api_client: APIClient) -> None:
     owner = create_user(email="owner@example.com", username="owner")
     other = create_user(email="other@example.com", username="other")
     room = create_room(owner=owner, name="general", visibility=RoomVisibility.PUBLIC)
-    RoomMembership.objects.create(
-        room=room, user=member, role=RoomRole.MEMBER, joined_at=timezone.now()
-    )
+    RoomMembership.objects.create(room=room, user=member, role=RoomRole.MEMBER, joined_at=timezone.now())
     RoomMessage.objects.create(room=room, sender_user=other, text="one")
     RoomMessage.objects.create(room=room, sender_user=other, text="two")
     RoomMessage.objects.create(room=room, sender_user=member, text="mine")
@@ -179,9 +175,7 @@ def test_room_update_and_delete_are_owner_only(api_client: APIClient) -> None:
     owner = create_user(email="owner@example.com", username="owner")
     member = create_user(email="member@example.com", username="member")
     room = create_room(owner=owner, name="engineering", visibility=RoomVisibility.PUBLIC)
-    RoomMembership.objects.create(
-        room=room, user=member, role=RoomRole.MEMBER, joined_at=timezone.now()
-    )
+    RoomMembership.objects.create(room=room, user=member, role=RoomRole.MEMBER, joined_at=timezone.now())
     api_client.force_login(member)
 
     update_response = api_client.patch(
@@ -244,9 +238,7 @@ def test_leave_room_rejects_owner_and_allows_member(api_client: APIClient) -> No
     owner = create_user(email="owner@example.com", username="owner")
     member = create_user(email="member@example.com", username="member")
     room = create_room(owner=owner, name="general", visibility=RoomVisibility.PUBLIC)
-    RoomMembership.objects.create(
-        room=room, user=member, role=RoomRole.MEMBER, joined_at=timezone.now()
-    )
+    RoomMembership.objects.create(room=room, user=member, role=RoomRole.MEMBER, joined_at=timezone.now())
 
     owner_client = APIClient()
     owner_client.force_login(owner)
@@ -267,9 +259,7 @@ def test_room_member_list_requires_membership(api_client: APIClient) -> None:
     member = create_user(email="member@example.com", username="member")
     outsider = create_user(email="outsider@example.com", username="outsider")
     room = create_room(owner=owner, name="general", visibility=RoomVisibility.PUBLIC)
-    RoomMembership.objects.create(
-        room=room, user=member, role=RoomRole.ADMIN, joined_at=timezone.now()
-    )
+    RoomMembership.objects.create(room=room, user=member, role=RoomRole.ADMIN, joined_at=timezone.now())
 
     member_client = APIClient()
     member_client.force_login(member)
@@ -277,9 +267,7 @@ def test_room_member_list_requires_membership(api_client: APIClient) -> None:
     outsider_client.force_login(outsider)
 
     member_response = member_client.get(reverse("room-member-list", kwargs={"room_id": room.id}))
-    outsider_response = outsider_client.get(
-        reverse("room-member-list", kwargs={"room_id": room.id})
-    )
+    outsider_response = outsider_client.get(reverse("room-member-list", kwargs={"room_id": room.id}))
 
     assert member_response.status_code == 200
     assert member_response.json()["data"][0]["role"] == "owner"
@@ -298,9 +286,7 @@ def test_dialog_create_returns_existing_dialog_and_requires_friendship(
     existing_dialog = Dialog.objects.create(user_low=user_low, user_high=user_high)
     api_client.force_login(alice)
 
-    response = api_client.post(
-        reverse("dialog-list-create"), {"user_id": str(bob.id)}, format="json"
-    )
+    response = api_client.post(reverse("dialog-list-create"), {"user_id": str(bob.id)}, format="json")
 
     assert response.status_code == 200
     assert response.json()["data"]["dialog"]["id"] == str(existing_dialog.id)
@@ -372,9 +358,7 @@ def test_room_message_history_send_reply_edit_delete_and_read_flow(api_client: A
     member = create_user(email="member@example.com", username="member")
     outsider = create_user(email="outsider@example.com", username="outsider")
     room = create_room(owner=owner, name="history-room", visibility=RoomVisibility.PUBLIC)
-    RoomMembership.objects.create(
-        room=room, user=member, role=RoomRole.ADMIN, joined_at=timezone.now()
-    )
+    RoomMembership.objects.create(room=room, user=member, role=RoomRole.ADMIN, joined_at=timezone.now())
     first = RoomMessage.objects.create(room=room, sender_user=owner, text="first")
     second = RoomMessage.objects.create(room=room, sender_user=owner, text="second")
     attachment = Attachment.objects.create(
@@ -424,16 +408,9 @@ def test_room_message_history_send_reply_edit_delete_and_read_flow(api_client: A
         }
     ]
     assert attachment.binding_type == AttachmentBindingType.ROOM_MESSAGE
-    assert (
-        RoomMessageAttachment.objects.filter(
-            room_message=created_message, attachment=attachment
-        ).exists()
-        is True
-    )
+    assert RoomMessageAttachment.objects.filter(room_message=created_message, attachment=attachment).exists() is True
 
-    page_one = owner_client.get(
-        reverse("room-message-list-create", kwargs={"room_id": room.id}), {"limit": 2}
-    )
+    page_one = owner_client.get(reverse("room-message-list-create", kwargs={"room_id": room.id}), {"limit": 2})
     assert page_one.status_code == 200
     assert [item["id"] for item in page_one.json()["data"]] == [
         str(second.id),
@@ -449,18 +426,14 @@ def test_room_message_history_send_reply_edit_delete_and_read_flow(api_client: A
     assert [item["id"] for item in page_two.json()["data"]] == [str(first.id)]
 
     edit_forbidden = outsider_client.patch(
-        reverse(
-            "room-message-detail", kwargs={"room_id": room.id, "message_id": created_message.id}
-        ),
+        reverse("room-message-detail", kwargs={"room_id": room.id, "message_id": created_message.id}),
         {"text": "hijack"},
         format="json",
     )
     assert edit_forbidden.status_code == 404
 
     edit_response = owner_client.patch(
-        reverse(
-            "room-message-detail", kwargs={"room_id": room.id, "message_id": created_message.id}
-        ),
+        reverse("room-message-detail", kwargs={"room_id": room.id, "message_id": created_message.id}),
         {"text": "third updated"},
         format="json",
     )
@@ -469,9 +442,7 @@ def test_room_message_history_send_reply_edit_delete_and_read_flow(api_client: A
     assert edit_response.json()["data"]["message"]["text"] == "third updated"
 
     delete_response = member_client.delete(
-        reverse(
-            "room-message-detail", kwargs={"room_id": room.id, "message_id": created_message.id}
-        )
+        reverse("room-message-detail", kwargs={"room_id": room.id, "message_id": created_message.id})
     )
     assert delete_response.status_code == 204
     assert RoomMessage.objects.filter(id=created_message.id).exists() is False
@@ -490,13 +461,9 @@ def test_room_message_validation_and_authorization_rules(api_client: APIClient) 
     banned_user = create_user(email="banned@example.com", username="banned")
     room = create_room(owner=owner, name="validation-room", visibility=RoomVisibility.PUBLIC)
     other_room = create_room(owner=other_owner, name="other-room", visibility=RoomVisibility.PUBLIC)
-    RoomMembership.objects.create(
-        room=room, user=banned_user, role=RoomRole.MEMBER, joined_at=timezone.now()
-    )
+    RoomMembership.objects.create(room=room, user=banned_user, role=RoomRole.MEMBER, joined_at=timezone.now())
     RoomBan.objects.create(room=room, user=banned_user, banned_by_user=owner)
-    foreign_message = RoomMessage.objects.create(
-        room=other_room, sender_user=other_owner, text="foreign"
-    )
+    foreign_message = RoomMessage.objects.create(room=other_room, sender_user=other_owner, text="foreign")
 
     owner_client = APIClient()
     owner_client.force_login(owner)
@@ -536,12 +503,8 @@ def test_room_message_delete_requires_author_or_moderator(api_client: APIClient)
     author = create_user(email="author@example.com", username="author")
     member = create_user(email="member3@example.com", username="member3")
     room = create_room(owner=owner, name="delete-room", visibility=RoomVisibility.PUBLIC)
-    RoomMembership.objects.create(
-        room=room, user=author, role=RoomRole.MEMBER, joined_at=timezone.now()
-    )
-    RoomMembership.objects.create(
-        room=room, user=member, role=RoomRole.MEMBER, joined_at=timezone.now()
-    )
+    RoomMembership.objects.create(room=room, user=author, role=RoomRole.MEMBER, joined_at=timezone.now())
+    RoomMembership.objects.create(room=room, user=member, role=RoomRole.MEMBER, joined_at=timezone.now())
     message = RoomMessage.objects.create(room=room, sender_user=author, text="delete me")
 
     member_client = APIClient()
@@ -596,10 +559,7 @@ def test_dialog_message_send_history_edit_delete_and_read_flow(api_client: APICl
     attachment.refresh_from_db()
     assert attachment.binding_type == AttachmentBindingType.DIALOG_MESSAGE
     assert (
-        DialogMessageAttachment.objects.filter(
-            dialog_message=created_message, attachment=attachment
-        ).exists()
-        is True
+        DialogMessageAttachment.objects.filter(dialog_message=created_message, attachment=attachment).exists() is True
     )
 
     list_response = bob_client.get(
@@ -608,9 +568,7 @@ def test_dialog_message_send_history_edit_delete_and_read_flow(api_client: APICl
     assert list_response.status_code == 200
     assert [item["id"] for item in list_response.json()["data"]] == [str(first.id), created_id]
 
-    outsider_list = outsider_client.get(
-        reverse("dialog-message-list-create", kwargs={"dialog_id": dialog.id})
-    )
+    outsider_list = outsider_client.get(reverse("dialog-message-list-create", kwargs={"dialog_id": dialog.id}))
     assert outsider_list.status_code == 404
 
     edit_response = alice_client.patch(
@@ -655,9 +613,7 @@ def test_dialog_message_send_rejects_frozen_dialog_and_peer_ban_but_history_rema
     bob = create_user(email="bob3@example.com", username="bob3")
     make_friends(alice, bob)
     user_low, user_high = sorted([alice, bob], key=lambda user: str(user.id))
-    dialog = Dialog.objects.create(
-        user_low=user_low, user_high=user_high, is_frozen=True, frozen_reason="moderated"
-    )
+    dialog = Dialog.objects.create(user_low=user_low, user_high=user_high, is_frozen=True, frozen_reason="moderated")
     existing_message = DialogMessage.objects.create(dialog=dialog, sender_user=bob, text="history")
 
     alice_client = APIClient()
@@ -668,15 +624,10 @@ def test_dialog_message_send_rejects_frozen_dialog_and_peer_ban_but_history_rema
         {"text": "blocked"},
         format="json",
     )
-    list_response = alice_client.get(
-        reverse("dialog-message-list-create", kwargs={"dialog_id": dialog.id})
-    )
+    list_response = alice_client.get(reverse("dialog-message-list-create", kwargs={"dialog_id": dialog.id}))
 
     assert send_response.status_code == 403
-    assert (
-        send_response.json()["error"]["message"]
-        == "You are not allowed to send messages to this dialog."
-    )
+    assert send_response.json()["error"]["message"] == "You are not allowed to send messages to this dialog."
     assert list_response.status_code == 200
     assert list_response.json()["data"][0]["id"] == str(existing_message.id)
 
@@ -700,9 +651,7 @@ def test_private_room_invitation_flow_requires_admin_and_creates_membership(
     invited = create_user(email="invite-user@example.com", username="invite-user")
     outsider = create_user(email="invite-outsider@example.com", username="invite-outsider")
     room = create_room(owner=owner, name="private-invites", visibility=RoomVisibility.PRIVATE)
-    RoomMembership.objects.create(
-        room=room, user=admin, role=RoomRole.ADMIN, joined_at=timezone.now()
-    )
+    RoomMembership.objects.create(room=room, user=admin, role=RoomRole.ADMIN, joined_at=timezone.now())
 
     outsider_client = APIClient()
     outsider_client.force_login(outsider)
@@ -726,15 +675,11 @@ def test_private_room_invitation_flow_requires_admin_and_creates_membership(
     assert create_response.status_code == 201
     invitation_id = create_response.json()["data"]["invitation"]["id"]
 
-    list_response = admin_client.get(
-        reverse("room-invitation-list-create", kwargs={"room_id": room.id})
-    )
+    list_response = admin_client.get(reverse("room-invitation-list-create", kwargs={"room_id": room.id}))
     assert list_response.status_code == 200
     assert list_response.json()["data"][0]["user"]["username"] == invited.username
 
-    accept_response = invited_client.post(
-        reverse("room-invitation-accept", kwargs={"invitation_id": invitation_id})
-    )
+    accept_response = invited_client.post(reverse("room-invitation-accept", kwargs={"invitation_id": invitation_id}))
     assert accept_response.status_code == 204
     membership = RoomMembership.objects.get(room=room, user=invited)
     assert membership.role == RoomRole.MEMBER
@@ -747,12 +692,8 @@ def test_room_admin_promotion_and_demotion_follow_role_rules(api_client: APIClie
     admin = create_user(email="role-admin@example.com", username="role-admin")
     member = create_user(email="role-member@example.com", username="role-member")
     room = create_room(owner=owner, name="role-room", visibility=RoomVisibility.PUBLIC)
-    RoomMembership.objects.create(
-        room=room, user=admin, role=RoomRole.ADMIN, joined_at=timezone.now()
-    )
-    RoomMembership.objects.create(
-        room=room, user=member, role=RoomRole.MEMBER, joined_at=timezone.now()
-    )
+    RoomMembership.objects.create(room=room, user=admin, role=RoomRole.ADMIN, joined_at=timezone.now())
+    RoomMembership.objects.create(room=room, user=member, role=RoomRole.MEMBER, joined_at=timezone.now())
 
     owner_client = APIClient()
     owner_client.force_login(owner)
@@ -774,9 +715,7 @@ def test_room_admin_promotion_and_demotion_follow_role_rules(api_client: APIClie
     assert owner_promote_response.status_code == 204
     RoomMembership.objects.get(room=room, user=member, role=RoomRole.ADMIN)
 
-    owner_client.delete(
-        reverse("room-admin-detail", kwargs={"room_id": room.id, "user_id": member.id})
-    )
+    owner_client.delete(reverse("room-admin-detail", kwargs={"room_id": room.id, "user_id": member.id}))
     RoomMembership.objects.get(room=room, user=member, role=RoomRole.MEMBER)
 
     self_demote_response = admin_client.delete(
@@ -791,12 +730,8 @@ def test_room_remove_member_and_room_ban_flow_enforces_access_rules(api_client: 
     admin = create_user(email="ban-admin@example.com", username="ban-admin")
     member = create_user(email="ban-member@example.com", username="ban-member")
     room = create_room(owner=owner, name="ban-room", visibility=RoomVisibility.PUBLIC)
-    RoomMembership.objects.create(
-        room=room, user=admin, role=RoomRole.ADMIN, joined_at=timezone.now()
-    )
-    RoomMembership.objects.create(
-        room=room, user=member, role=RoomRole.MEMBER, joined_at=timezone.now()
-    )
+    RoomMembership.objects.create(room=room, user=admin, role=RoomRole.ADMIN, joined_at=timezone.now())
+    RoomMembership.objects.create(room=room, user=member, role=RoomRole.MEMBER, joined_at=timezone.now())
     RoomMessage.objects.create(room=room, sender_user=owner, text="visible before ban")
 
     admin_client = APIClient()
@@ -813,20 +748,14 @@ def test_room_remove_member_and_room_ban_flow_enforces_access_rules(api_client: 
     assert RoomMembership.objects.filter(room=room, user=member).exists() is False
     assert RoomBan.objects.filter(room=room, user=member, removed_at__isnull=True).exists() is True
 
-    banned_history = member_client.get(
-        reverse("room-message-list-create", kwargs={"room_id": room.id})
-    )
+    banned_history = member_client.get(reverse("room-message-list-create", kwargs={"room_id": room.id}))
     assert banned_history.status_code == 404
 
-    ban_list_response = admin_client.get(
-        reverse("room-ban-list-create", kwargs={"room_id": room.id})
-    )
+    ban_list_response = admin_client.get(reverse("room-ban-list-create", kwargs={"room_id": room.id}))
     assert ban_list_response.status_code == 200
     assert ban_list_response.json()["data"][0]["user"]["username"] == member.username
 
-    unban_response = admin_client.delete(
-        reverse("room-ban-detail", kwargs={"room_id": room.id, "user_id": member.id})
-    )
+    unban_response = admin_client.delete(reverse("room-ban-detail", kwargs={"room_id": room.id, "user_id": member.id}))
     assert unban_response.status_code == 204
     assert RoomBan.objects.filter(room=room, user=member, removed_at__isnull=True).exists() is False
 

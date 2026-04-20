@@ -113,10 +113,7 @@ def build_openapi_schema(request) -> dict:
                 "get": _operation(
                     summary="Open Swagger UI",
                     tags=["Documentation"],
-                    description=(
-                        "Serves the Swagger UI configured against the backend "
-                        "OpenAPI schema."
-                    ),
+                    description=("Serves the Swagger UI configured against the backend OpenAPI schema."),
                     response_description="Swagger UI HTML page.",
                     auth_required=False,
                 )
@@ -214,9 +211,7 @@ def build_openapi_schema(request) -> dict:
                     tags=["Sessions"],
                     description="Revokes the targeted active session.",
                     response_description="Session revoked.",
-                    parameters=[
-                        _path_parameter("session_id", "Session identifier.", schema_format="uuid")
-                    ],
+                    parameters=[_path_parameter("session_id", "Session identifier.", schema_format="uuid")],
                     status_code="204",
                 )
             },
@@ -235,9 +230,7 @@ def build_openapi_schema(request) -> dict:
                     tags=["Users"],
                     description="Returns the public user profile for the given user id.",
                     response_description="Public user payload.",
-                    parameters=[
-                        _path_parameter("user_id", "User identifier.", schema_format="uuid")
-                    ],
+                    parameters=[_path_parameter("user_id", "User identifier.", schema_format="uuid")],
                 )
             },
             "/api/v1/friends": {
@@ -254,9 +247,7 @@ def build_openapi_schema(request) -> dict:
                     tags=["Social"],
                     description="Removes an existing friendship and freezes direct messaging.",
                     response_description="Friend removed.",
-                    parameters=[
-                        _path_parameter("user_id", "User identifier.", schema_format="uuid")
-                    ],
+                    parameters=[_path_parameter("user_id", "User identifier.", schema_format="uuid")],
                     status_code="204",
                 )
             },
@@ -292,9 +283,7 @@ def build_openapi_schema(request) -> dict:
                     tags=["Social"],
                     description="Accepts a pending incoming friend request.",
                     response_description="Accepted friendship payload.",
-                    parameters=[
-                        _path_parameter("request_id", "Friend request identifier.", schema_format="uuid")
-                    ],
+                    parameters=[_path_parameter("request_id", "Friend request identifier.", schema_format="uuid")],
                 )
             },
             "/api/v1/friend-requests/{request_id}/reject": {
@@ -303,9 +292,7 @@ def build_openapi_schema(request) -> dict:
                     tags=["Social"],
                     description="Rejects a pending incoming friend request.",
                     response_description="Friend request rejected.",
-                    parameters=[
-                        _path_parameter("request_id", "Friend request identifier.", schema_format="uuid")
-                    ],
+                    parameters=[_path_parameter("request_id", "Friend request identifier.", schema_format="uuid")],
                     status_code="204",
                 )
             },
@@ -331,9 +318,7 @@ def build_openapi_schema(request) -> dict:
                     tags=["Social"],
                     description="Removes an active peer ban created by the authenticated user.",
                     response_description="Peer ban removed.",
-                    parameters=[
-                        _path_parameter("user_id", "User identifier.", schema_format="uuid")
-                    ],
+                    parameters=[_path_parameter("user_id", "User identifier.", schema_format="uuid")],
                     status_code="204",
                 )
             },
@@ -349,10 +334,7 @@ def build_openapi_schema(request) -> dict:
                 "get": _operation(
                     summary="List joined rooms",
                     tags=["Rooms"],
-                    description=(
-                        "Returns rooms joined by the authenticated user, "
-                        "including unread counts."
-                    ),
+                    description=("Returns rooms joined by the authenticated user, including unread counts."),
                     response_description="Joined room list payload.",
                 )
             },
@@ -372,9 +354,7 @@ def build_openapi_schema(request) -> dict:
                     tags=["Rooms"],
                     description="Returns room details visible to the authenticated user.",
                     response_description="Room detail payload.",
-                    parameters=[
-                        _path_parameter("room_id", "Room identifier.", schema_format="uuid")
-                    ],
+                    parameters=[_path_parameter("room_id", "Room identifier.", schema_format="uuid")],
                 ),
                 "patch": _operation(
                     summary="Update room",
@@ -382,18 +362,14 @@ def build_openapi_schema(request) -> dict:
                     description="Updates room properties for authorized users.",
                     response_description="Updated room payload.",
                     request_body=_json_request_body(),
-                    parameters=[
-                        _path_parameter("room_id", "Room identifier.", schema_format="uuid")
-                    ],
+                    parameters=[_path_parameter("room_id", "Room identifier.", schema_format="uuid")],
                 ),
                 "delete": _operation(
                     summary="Delete room",
                     tags=["Rooms"],
                     description="Deletes a room for authorized owners.",
                     response_description="Room deleted.",
-                    parameters=[
-                        _path_parameter("room_id", "Room identifier.", schema_format="uuid")
-                    ],
+                    parameters=[_path_parameter("room_id", "Room identifier.", schema_format="uuid")],
                     status_code="204",
                 ),
             },
@@ -403,9 +379,7 @@ def build_openapi_schema(request) -> dict:
                     tags=["Rooms"],
                     description="Joins a public room when allowed.",
                     response_description="Room joined.",
-                    parameters=[
-                        _path_parameter("room_id", "Room identifier.", schema_format="uuid")
-                    ],
+                    parameters=[_path_parameter("room_id", "Room identifier.", schema_format="uuid")],
                     status_code="204",
                 )
             },
@@ -415,9 +389,7 @@ def build_openapi_schema(request) -> dict:
                     tags=["Rooms"],
                     description="Leaves a joined room when allowed.",
                     response_description="Room left.",
-                    parameters=[
-                        _path_parameter("room_id", "Room identifier.", schema_format="uuid")
-                    ],
+                    parameters=[_path_parameter("room_id", "Room identifier.", schema_format="uuid")],
                     status_code="204",
                 )
             },
@@ -427,9 +399,7 @@ def build_openapi_schema(request) -> dict:
                     tags=["Rooms"],
                     description="Returns paginated room membership data for room members.",
                     response_description="Room member list payload.",
-                    parameters=[
-                        _path_parameter("room_id", "Room identifier.", schema_format="uuid")
-                    ],
+                    parameters=[_path_parameter("room_id", "Room identifier.", schema_format="uuid")],
                 )
             },
             "/api/v1/rooms/{room_id}/invitations": {
@@ -438,18 +408,14 @@ def build_openapi_schema(request) -> dict:
                     tags=["Rooms"],
                     description="Returns pending invitations for a room when the actor may manage invites.",
                     response_description="Room invitation list payload.",
-                    parameters=[
-                        _path_parameter("room_id", "Room identifier.", schema_format="uuid")
-                    ],
+                    parameters=[_path_parameter("room_id", "Room identifier.", schema_format="uuid")],
                 ),
                 "post": _operation(
                     summary="Create room invitation",
                     tags=["Rooms"],
                     description="Creates a pending invitation for a private room.",
                     response_description="Created room invitation payload.",
-                    parameters=[
-                        _path_parameter("room_id", "Room identifier.", schema_format="uuid")
-                    ],
+                    parameters=[_path_parameter("room_id", "Room identifier.", schema_format="uuid")],
                     request_body=_json_request_body(["username"]),
                     status_code="201",
                 ),
@@ -492,9 +458,7 @@ def build_openapi_schema(request) -> dict:
                     tags=["Rooms"],
                     description="Promotes an existing room member to admin.",
                     response_description="Member promoted to admin.",
-                    parameters=[
-                        _path_parameter("room_id", "Room identifier.", schema_format="uuid")
-                    ],
+                    parameters=[_path_parameter("room_id", "Room identifier.", schema_format="uuid")],
                     request_body=_json_request_body(["user_id"]),
                     status_code="204",
                 )
@@ -518,9 +482,7 @@ def build_openapi_schema(request) -> dict:
                     tags=["Rooms"],
                     description="Removes a member from a room and treats the action as a ban.",
                     response_description="Member removed and banned.",
-                    parameters=[
-                        _path_parameter("room_id", "Room identifier.", schema_format="uuid")
-                    ],
+                    parameters=[_path_parameter("room_id", "Room identifier.", schema_format="uuid")],
                     request_body=_json_request_body(["user_id"]),
                     status_code="204",
                 )
@@ -531,18 +493,14 @@ def build_openapi_schema(request) -> dict:
                     tags=["Rooms"],
                     description="Returns active room bans for actors allowed to moderate the room.",
                     response_description="Room ban list payload.",
-                    parameters=[
-                        _path_parameter("room_id", "Room identifier.", schema_format="uuid")
-                    ],
+                    parameters=[_path_parameter("room_id", "Room identifier.", schema_format="uuid")],
                 ),
                 "post": _operation(
                     summary="Create room ban",
                     tags=["Rooms"],
                     description="Bans a room member and removes room access immediately.",
                     response_description="Created room ban payload.",
-                    parameters=[
-                        _path_parameter("room_id", "Room identifier.", schema_format="uuid")
-                    ],
+                    parameters=[_path_parameter("room_id", "Room identifier.", schema_format="uuid")],
                     request_body=_json_request_body(["user_id"]),
                     status_code="201",
                 ),
@@ -599,9 +557,7 @@ def build_openapi_schema(request) -> dict:
                 "get": _operation(
                     summary="Get attachment metadata",
                     tags=["Attachments"],
-                    description=(
-                        "Returns attachment metadata when the authenticated user is authorized."
-                    ),
+                    description=("Returns attachment metadata when the authenticated user is authorized."),
                     response_description="Attachment metadata payload.",
                     parameters=[
                         _path_parameter(

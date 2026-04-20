@@ -2,6 +2,7 @@ from django.contrib.auth import get_user_model
 from rest_framework import serializers
 
 from ..accounts.serializers import serialize_public_user
+from ..common.enums import ChatType, RoomVisibility
 from .models import (
     Dialog,
     DialogMessage,
@@ -11,7 +12,6 @@ from .models import (
     RoomMembership,
     RoomMessage,
 )
-from ..common.enums import ChatType, RoomVisibility
 
 User = get_user_model()
 
@@ -88,9 +88,7 @@ def serialize_joined_room_item(*, membership: RoomMembership, unread_count: int)
 
 
 def serialize_room_detail(*, room: Room, current_user_role: str, is_member: bool) -> dict:
-    admin_memberships = list(
-        room.memberships.select_related("user").filter(role__in=["owner", "admin"])
-    )
+    admin_memberships = list(room.memberships.select_related("user").filter(role__in=["owner", "admin"]))
     admin_memberships.sort(
         key=lambda membership: (
             0 if membership.role == "owner" else 1,
@@ -224,8 +222,7 @@ def serialize_message_reply(reply_to_message) -> dict | None:
 
 def _serialize_message(*, message, chat_type: str, chat_id) -> dict:
     attachments = [
-        serialize_message_attachment(binding.attachment)
-        for binding in getattr(message, "attachment_bindings").all()
+        serialize_message_attachment(binding.attachment) for binding in getattr(message, "attachment_bindings").all()
     ]
     return {
         "id": str(message.id),

@@ -28,9 +28,7 @@ class Command(BaseCommand):
     def handle(self, *args, **options) -> None:
         storage = get_attachment_storage()
         if self._is_filesystem_storage(storage):
-            raise CommandError(
-                "backfill_attachments_to_object_storage requires ATTACHMENTS_STORAGE_BACKEND=s3."
-            )
+            raise CommandError("backfill_attachments_to_object_storage requires ATTACHMENTS_STORAGE_BACKEND=s3.")
 
         source_root = Path(options["source_root"]).resolve()
         dry_run = options["dry_run"]
@@ -60,8 +58,7 @@ class Command(BaseCommand):
             if source_size != attachment.size_bytes:
                 stats["size_mismatch"] += 1
                 self.stdout.write(
-                    "SIZE_MISMATCH "
-                    f"{attachment.id} expected={attachment.size_bytes} actual={source_size}"
+                    f"SIZE_MISMATCH {attachment.id} expected={attachment.size_bytes} actual={source_size}"
                 )
                 continue
 
@@ -86,19 +83,14 @@ class Command(BaseCommand):
             if copied_size != source_size:
                 storage.delete(storage_key=attachment.storage_key)
                 stats["failed"] += 1
-                self.stdout.write(
-                    f"FAILED {attachment.id} copied_size={copied_size} expected={source_size}"
-                )
+                self.stdout.write(f"FAILED {attachment.id} copied_size={copied_size} expected={source_size}")
                 continue
 
             stats["copied"] += 1
             self.stdout.write(f"COPIED {attachment.id} {attachment.storage_key}")
 
         self.stdout.write(
-            self.style.SUCCESS(
-                "Backfill summary: "
-                + ", ".join(f"{key}={value}" for key, value in stats.items())
-            )
+            self.style.SUCCESS("Backfill summary: " + ", ".join(f"{key}={value}" for key, value in stats.items()))
         )
 
     def _is_filesystem_storage(self, storage) -> bool:

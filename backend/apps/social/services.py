@@ -44,9 +44,7 @@ def _canonical_user_pair(user_a: User, user_b: User) -> tuple[User, User]:
 def _freeze_dialog_for_pair(*, user_a: User, user_b: User, reason: str) -> Dialog | None:
     user_low, user_high = _canonical_user_pair(user_a, user_b)
     dialog = (
-        Dialog.objects.select_related("user_low", "user_high")
-        .filter(user_low=user_low, user_high=user_high)
-        .first()
+        Dialog.objects.select_related("user_low", "user_high").filter(user_low=user_low, user_high=user_high).first()
     )
     if dialog is None:
         return None
@@ -129,15 +127,18 @@ def create_friend_request(*, from_user: User, username: str, message: str | None
     user_low, user_high = _canonical_user_pair(from_user, to_user)
     if Friendship.objects.filter(user_low=user_low, user_high=user_high).exists():
         raise SocialConflictError("You are already friends with this user.")
-    has_pending_request = FriendRequest.objects.filter(
-        from_user=from_user,
-        to_user=to_user,
-        status=FriendRequestStatus.PENDING,
-    ).exists() or FriendRequest.objects.filter(
-        from_user=to_user,
-        to_user=from_user,
-        status=FriendRequestStatus.PENDING,
-    ).exists()
+    has_pending_request = (
+        FriendRequest.objects.filter(
+            from_user=from_user,
+            to_user=to_user,
+            status=FriendRequestStatus.PENDING,
+        ).exists()
+        or FriendRequest.objects.filter(
+            from_user=to_user,
+            to_user=from_user,
+            status=FriendRequestStatus.PENDING,
+        ).exists()
+    )
     if has_pending_request:
         raise SocialConflictError("A pending friend request already exists for this user.")
     try:

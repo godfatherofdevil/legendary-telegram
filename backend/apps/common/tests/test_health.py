@@ -32,15 +32,9 @@ def test_ready_health_endpoint_reports_runtime_checks(
     assert response.json()["status"] == "ok"
     assert response.json()["checks"]["database"] == "ok"
     assert response.json()["checks"]["redis_configured"] == bool(settings.REDIS_URL)
-    assert (
-        response.json()["checks"]["channel_layer_backend"]
-        == settings.CHANNEL_LAYERS["default"]["BACKEND"]
-    )
+    assert response.json()["checks"]["channel_layer_backend"] == settings.CHANNEL_LAYERS["default"]["BACKEND"]
     assert response.json()["checks"]["realtime_transport"] in {"redis", "inmemory"}
-    assert (
-        response.json()["checks"]["attachment_storage_backend"]
-        == settings.ATTACHMENTS_STORAGE_BACKEND
-    )
+    assert response.json()["checks"]["attachment_storage_backend"] == settings.ATTACHMENTS_STORAGE_BACKEND
     assert response.json()["checks"]["attachment_storage"] == "ok"
     assert response.json()["migration_flags"] == settings.CHAT_MIGRATION_FLAGS
 

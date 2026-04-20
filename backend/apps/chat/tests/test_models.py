@@ -3,8 +3,8 @@ from django.db import IntegrityError
 from django.utils import timezone
 
 from ...accounts.models import User
-from ..models import Dialog, Room, RoomInvitation
 from ...common.enums import RoomInvitationStatus, RoomVisibility
+from ..models import Dialog, Room, RoomInvitation
 
 
 @pytest.mark.django_db

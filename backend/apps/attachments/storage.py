@@ -12,14 +12,10 @@ class AttachmentObjectNotFoundError(FileNotFoundError):
 
 
 class AttachmentStorage:
-    def put_uploaded_file(
-        self, *, storage_key: str, uploaded_file, content_type: str, original_filename: str
-    ) -> None:
+    def put_uploaded_file(self, *, storage_key: str, uploaded_file, content_type: str, original_filename: str) -> None:
         raise NotImplementedError
 
-    def put_bytes(
-        self, *, storage_key: str, data: bytes, content_type: str, original_filename: str
-    ) -> None:
+    def put_bytes(self, *, storage_key: str, data: bytes, content_type: str, original_filename: str) -> None:
         raise NotImplementedError
 
     def upload_from_path(
@@ -52,18 +48,14 @@ def attachment_absolute_path(storage_key: str) -> Path:
 
 
 class LocalFilesystemAttachmentStorage(AttachmentStorage):
-    def put_uploaded_file(
-        self, *, storage_key: str, uploaded_file, content_type: str, original_filename: str
-    ) -> None:
+    def put_uploaded_file(self, *, storage_key: str, uploaded_file, content_type: str, original_filename: str) -> None:
         path = attachment_absolute_path(storage_key)
         path.parent.mkdir(parents=True, exist_ok=True)
         with path.open("wb") as destination:
             for chunk in uploaded_file.chunks():
                 destination.write(chunk)
 
-    def put_bytes(
-        self, *, storage_key: str, data: bytes, content_type: str, original_filename: str
-    ) -> None:
+    def put_bytes(self, *, storage_key: str, data: bytes, content_type: str, original_filename: str) -> None:
         path = attachment_absolute_path(storage_key)
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_bytes(data)
@@ -145,13 +137,9 @@ def _build_s3_client():
 class S3AttachmentStorage(AttachmentStorage):
     def __init__(self) -> None:
         if not settings.ATTACHMENTS_S3_ENDPOINT_URL:
-            raise ImproperlyConfigured(
-                "ATTACHMENTS_S3_ENDPOINT_URL must be configured for the s3 attachment backend."
-            )
+            raise ImproperlyConfigured("ATTACHMENTS_S3_ENDPOINT_URL must be configured for the s3 attachment backend.")
         if not settings.ATTACHMENTS_S3_BUCKET:
-            raise ImproperlyConfigured(
-                "ATTACHMENTS_S3_BUCKET must be configured for the s3 attachment backend."
-            )
+            raise ImproperlyConfigured("ATTACHMENTS_S3_BUCKET must be configured for the s3 attachment backend.")
 
     @property
     def bucket_name(self) -> str:
@@ -166,9 +154,7 @@ class S3AttachmentStorage(AttachmentStorage):
             "Metadata": {"original_filename": original_filename},
         }
 
-    def put_uploaded_file(
-        self, *, storage_key: str, uploaded_file, content_type: str, original_filename: str
-    ) -> None:
+    def put_uploaded_file(self, *, storage_key: str, uploaded_file, content_type: str, original_filename: str) -> None:
         if hasattr(uploaded_file, "seek"):
             uploaded_file.seek(0)
         self._client().upload_fileobj(
@@ -181,9 +167,7 @@ class S3AttachmentStorage(AttachmentStorage):
             ),
         )
 
-    def put_bytes(
-        self, *, storage_key: str, data: bytes, content_type: str, original_filename: str
-    ) -> None:
+    def put_bytes(self, *, storage_key: str, data: bytes, content_type: str, original_filename: str) -> None:
         self._client().put_object(
             Bucket=self.bucket_name,
             Key=storage_key,
@@ -314,9 +298,7 @@ def get_attachment_storage() -> AttachmentStorage:
         return LocalFilesystemAttachmentStorage()
     if backend == "s3":
         return S3AttachmentStorage()
-    raise ImproperlyConfigured(
-        "ATTACHMENTS_STORAGE_BACKEND must be one of: filesystem, s3."
-    )
+    raise ImproperlyConfigured("ATTACHMENTS_STORAGE_BACKEND must be one of: filesystem, s3.")
 
 
 def get_legacy_attachment_storage() -> LocalFilesystemAttachmentStorage | None:
@@ -325,9 +307,7 @@ def get_legacy_attachment_storage() -> LocalFilesystemAttachmentStorage | None:
     return LocalFilesystemAttachmentStorage()
 
 
-def open_attachment_for_download(
-    *, storage_key: str, byte_range: tuple[int, int] | None = None
-) -> BinaryIO:
+def open_attachment_for_download(*, storage_key: str, byte_range: tuple[int, int] | None = None) -> BinaryIO:
     storage = get_attachment_storage()
     try:
         return storage.open(storage_key=storage_key, byte_range=byte_range)

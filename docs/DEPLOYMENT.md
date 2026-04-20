@@ -40,6 +40,8 @@ The backend and frontend MUST run in separate containers.
 
 The frontend MUST communicate with the backend over HTTP and WebSocket using container-exposed ports.
 
+The repository root `Makefile` is the preferred entrypoint for local development workflows. Its targets wrap the same Docker Compose and host-local commands documented here without changing service behavior.
+
 ---
 
 ## 3. Directory Assumptions
@@ -346,7 +348,7 @@ The backend MUST be deployable independently from the frontend.
 ### Step 1: Build backend container
 
 ```bash
-docker compose build backend
+make backend-build
 ```
 
 ### Step 2: Start backend dependencies
@@ -355,13 +357,25 @@ docker compose build backend
 docker compose up -d postgres redis minio minio-init
 ```
 
+Equivalent make target:
+
+```bash
+make infra-up
+```
+
 ### Step 3: Start backend
+
+```bash
+make backend-compose
+```
+
+The backend is healthy only when `GET /health/ready/` returns `200 OK`. The readiness endpoint verifies database connectivity, Redis reachability, and MinIO connectivity including the required `uploads` bucket when `ATTACHMENTS_STORAGE_BACKEND=s3`.
+
+Equivalent raw command:
 
 ```bash
 docker compose up backend
 ```
-
-The backend is healthy only when `GET /health/ready/` returns `200 OK`. The readiness endpoint verifies database connectivity, Redis reachability, and MinIO connectivity including the required `uploads` bucket when `ATTACHMENTS_STORAGE_BACKEND=s3`.
 
 ### Step 4: Verify backend
 
@@ -391,19 +405,19 @@ The frontend MUST be deployable independently from the backend application proce
 ### Step 1: Build frontend container
 
 ```bash
-docker compose build frontend
+make frontend-build
 ```
 
 ### Step 2: Ensure backend is running
 
 ```bash
-docker compose up -d postgres redis minio minio-init backend
+make backend-compose
 ```
 
 ### Step 3: Start frontend
 
 ```bash
-docker compose up frontend
+make frontend-compose
 ```
 
 The frontend service waits for the backend health check before starting.
@@ -429,13 +443,13 @@ Expected behavior:
 To start all services together:
 
 ```bash
-docker compose up --build
+make stack-up
 ```
 
 To start all services in detached mode:
 
 ```bash
-docker compose up --build -d
+make stack-up-detached
 ```
 
 ### Expected local ports
@@ -468,7 +482,7 @@ This is intended for local development after introducing the custom `accounts.Us
 If manual migration execution is preferred, use:
 
 ```bash
-docker compose run --rm backend python manage.py migrate
+make backend-migrate-compose
 ```
 
 If a superuser is needed for local admin testing:
@@ -519,7 +533,7 @@ volumes:
 ### View all logs
 
 ```bash
-docker compose logs -f
+make stack-logs
 ```
 
 ### View backend logs
@@ -559,13 +573,13 @@ docker compose logs -f minio minio-init
 Stop all running containers:
 
 ```bash
-docker compose down
+make stack-down
 ```
 
 Stop and remove volumes also:
 
 ```bash
-docker compose down -v
+make stack-down-volumes
 ```
 
 ### Warning
@@ -591,7 +605,7 @@ docker compose build backend frontend
 Then restart:
 
 ```bash
-docker compose up -d
+make stack-up-detached
 ```
 
 For a full clean rebuild:

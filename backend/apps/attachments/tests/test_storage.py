@@ -12,6 +12,8 @@ from django.urls import reverse
 from django.utils import timezone
 from rest_framework.test import APIClient
 
+from ...chat.models import Room, RoomMembership, RoomMessage
+from ...common.enums import AttachmentBindingType, RoomRole, RoomVisibility
 from ..models import Attachment, RoomMessageAttachment
 from ..storage import (
     AttachmentObjectNotFoundError,
@@ -23,8 +25,6 @@ from ..storage import (
     open_attachment_for_download,
 )
 from ..views import _iter_attachment_chunks
-from ...chat.models import Room, RoomMembership, RoomMessage
-from ...common.enums import AttachmentBindingType, RoomRole, RoomVisibility
 
 User = get_user_model()
 
@@ -235,9 +235,7 @@ def test_s3_attachment_storage_crud(fake_s3_client: FakeS3Client) -> None:
     assert storage.exists(storage_key="ab/file.txt") is True
     assert storage.size(storage_key="ab/file.txt") == 5
     assert storage.open(storage_key="ab/file.txt").read() == b"hello"
-    assert fake_s3_client.objects[("uploads", "ab/file.txt")]["metadata"] == {
-        "original_filename": "file.txt"
-    }
+    assert fake_s3_client.objects[("uploads", "ab/file.txt")]["metadata"] == {"original_filename": "file.txt"}
 
     storage.delete(storage_key="ab/file.txt")
 
@@ -442,12 +440,8 @@ def test_attachment_upload_and_download_preserve_contract_with_s3_backend(
 
     assert fake_s3_client.objects[("uploads", attachment.storage_key)]["body"] == b"s3-image"
 
-    metadata_response = api_client.get(
-        reverse("attachment-detail", kwargs={"attachment_id": attachment.id})
-    )
-    download_response = api_client.get(
-        reverse("attachment-download", kwargs={"attachment_id": attachment.id})
-    )
+    metadata_response = api_client.get(reverse("attachment-detail", kwargs={"attachment_id": attachment.id}))
+    download_response = api_client.get(reverse("attachment-download", kwargs={"attachment_id": attachment.id}))
 
     assert metadata_response.status_code == 200
     assert metadata_response.json()["data"]["attachment"]["filename"] == "photo.png"
@@ -499,9 +493,7 @@ def test_attachment_download_endpoint_serves_legacy_filesystem_blob_during_s3_cu
     member_client = APIClient()
     member_client.force_login(member)
 
-    response = member_client.get(
-        reverse("attachment-download", kwargs={"attachment_id": attachment.id})
-    )
+    response = member_client.get(reverse("attachment-download", kwargs={"attachment_id": attachment.id}))
 
     assert response.status_code == 200
     assert b"".join(response.streaming_content) == b"legacy-bytes"
@@ -674,7 +666,7 @@ def test_attachment_download_rejects_unsatisfiable_range_requests(
     ATTACHMENTS_S3_VERIFY_SSL=False,
 )
 def test_room_deletion_removes_s3_object_and_revokes_attachment_access(
-    fake_s3_client: FakeS3Client
+    fake_s3_client: FakeS3Client,
 ) -> None:
     owner = create_user(email="s3-owner@example.com", username="s3owner")
     member = create_user(email="s3-member@example.com", username="s3member")
@@ -711,21 +703,15 @@ def test_room_deletion_removes_s3_object_and_revokes_attachment_access(
     owner_client = APIClient()
     owner_client.force_login(owner)
 
-    assert member_client.get(
-        reverse("attachment-download", kwargs={"attachment_id": attachment.id})
-    ).status_code == 200
-    assert outsider_client.get(
-        reverse("attachment-detail", kwargs={"attachment_id": attachment.id})
-    ).status_code == 404
+    assert member_client.get(reverse("attachment-download", kwargs={"attachment_id": attachment.id})).status_code == 200
+    assert outsider_client.get(reverse("attachment-detail", kwargs={"attachment_id": attachment.id})).status_code == 404
 
     delete_response = owner_client.delete(reverse("room-detail", kwargs={"room_id": room.id}))
 
     assert delete_response.status_code == 204
     assert Attachment.objects.filter(id=attachment.id).exists() is False
     assert ("uploads", attachment.storage_key) not in fake_s3_client.objects
-    assert member_client.get(
-        reverse("attachment-download", kwargs={"attachment_id": attachment.id})
-    ).status_code == 404
+    assert member_client.get(reverse("attachment-download", kwargs={"attachment_id": attachment.id})).status_code == 404
 
 
 @pytest.mark.django_db
