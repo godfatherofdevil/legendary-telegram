@@ -124,6 +124,26 @@ class TrackingFile:
         self.closed = True
 
 
+class ClosingUploadedFile:
+    def __init__(self, data: bytes, name: str) -> None:
+        self._buffer = io.BytesIO(data)
+        self.name = name
+        self.closed = False
+
+    def read(self, size: int = -1) -> bytes:
+        if self.closed:
+            raise ValueError("I/O operation on closed file.")
+        return self._buffer.read(size)
+
+    def seek(self, offset: int, whence: int = 0) -> int:
+        if self.closed:
+            raise ValueError("I/O operation on closed file.")
+        return self._buffer.seek(offset, whence)
+
+    def close(self) -> None:
+        self.closed = True
+
+
 @pytest.fixture
 def api_client() -> APIClient:
     return APIClient()
@@ -224,6 +244,43 @@ def test_s3_attachment_storage_crud(fake_s3_client: FakeS3Client) -> None:
     assert storage.exists(storage_key="ab/file.txt") is False
     with pytest.raises(AttachmentObjectNotFoundError):
         storage.size(storage_key="ab/file.txt")
+
+
+@pytest.mark.django_db
+@override_settings(
+    ATTACHMENTS_STORAGE_BACKEND="s3",
+    ATTACHMENTS_S3_ENDPOINT_URL="http://minio:9000",
+    ATTACHMENTS_S3_BUCKET="uploads",
+    ATTACHMENTS_S3_ACCESS_KEY_ID="minioadmin",
+    ATTACHMENTS_S3_SECRET_ACCESS_KEY="minioadmin",
+    ATTACHMENTS_S3_USE_SSL=False,
+    ATTACHMENTS_S3_VERIFY_SSL=False,
+)
+def test_s3_attachment_storage_accepts_upload_stream_closed_by_backend(
+    fake_s3_client: FakeS3Client,
+) -> None:
+    storage = S3AttachmentStorage()
+    uploaded_file = ClosingUploadedFile(b"hello", "file.txt")
+
+    def upload_fileobj(fileobj, bucket: str, key: str, ExtraArgs: dict | None = None) -> None:
+        fake_s3_client.objects[(bucket, key)] = {
+            "body": fileobj.read(),
+            "content_type": (ExtraArgs or {}).get("ContentType"),
+            "metadata": (ExtraArgs or {}).get("Metadata", {}),
+        }
+        fileobj.close()
+
+    fake_s3_client.upload_fileobj = upload_fileobj
+
+    storage.put_uploaded_file(
+        storage_key="ab/file.txt",
+        uploaded_file=uploaded_file,
+        content_type="text/plain",
+        original_filename="file.txt",
+    )
+
+    assert uploaded_file.closed is True
+    assert fake_s3_client.objects[("uploads", "ab/file.txt")]["body"] == b"hello"
 
 
 @pytest.mark.django_db

@@ -180,8 +180,6 @@ class S3AttachmentStorage(AttachmentStorage):
                 original_filename=original_filename,
             ),
         )
-        if hasattr(uploaded_file, "seek"):
-            uploaded_file.seek(0)
 
     def put_bytes(
         self, *, storage_key: str, data: bytes, content_type: str, original_filename: str
