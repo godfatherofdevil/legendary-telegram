@@ -52,6 +52,7 @@ import {
   uploadAttachment,
 } from "./lib/api";
 import { MessageAttachmentCard } from "./components/MessageAttachmentCard";
+import { applyFriendRequestUpdate } from "./lib/friendRequestEvents";
 import type {
   ActiveChat,
   DialogSummary,
@@ -474,6 +475,10 @@ export default function App() {
   const wsRef = useRef<WebSocket | null>(null);
   const activeChatRef = useRef<ActiveChat | null>(null);
   const profileRef = useRef<User | null>(null);
+  const friendsRef = useRef<FriendItem[]>([]);
+  const incomingRequestsRef = useRef<IncomingFriendRequest[]>([]);
+  const outgoingRequestsRef = useRef<OutgoingFriendRequest[]>([]);
+  const notificationSummaryRef = useRef<NotificationSummary>(EMPTY_SUMMARY);
   const tabIdRef = useRef(`tab-${crypto.randomUUID()}`);
   const subscribedChatRef = useRef<ActiveChat | null>(null);
   const messageViewportRef = useRef<HTMLDivElement | null>(null);
@@ -487,6 +492,22 @@ export default function App() {
   useEffect(() => {
     profileRef.current = profile;
   }, [profile]);
+
+  useEffect(() => {
+    friendsRef.current = friends;
+  }, [friends]);
+
+  useEffect(() => {
+    incomingRequestsRef.current = incomingRequests;
+  }, [incomingRequests]);
+
+  useEffect(() => {
+    outgoingRequestsRef.current = outgoingRequests;
+  }, [outgoingRequests]);
+
+  useEffect(() => {
+    notificationSummaryRef.current = notificationSummary;
+  }, [notificationSummary]);
 
   useEffect(() => {
     if (!wsRef.current || wsRef.current.readyState !== WebSocket.OPEN) {
@@ -869,7 +890,21 @@ export default function App() {
         id: string;
         status: "accepted" | "rejected" | "cancelled";
         other_user: User;
+        responded_at?: string;
       };
+      const nextFriendRequestState = applyFriendRequestUpdate(
+        {
+          friends: friendsRef.current,
+          incomingRequests: incomingRequestsRef.current,
+          outgoingRequests: outgoingRequestsRef.current,
+          notificationSummary: notificationSummaryRef.current,
+        },
+        request,
+      );
+      setFriends(nextFriendRequestState.friends);
+      setIncomingRequests(nextFriendRequestState.incomingRequests);
+      setOutgoingRequests(nextFriendRequestState.outgoingRequests);
+      setNotificationSummary(nextFriendRequestState.notificationSummary);
       refreshCurrentShellSilently();
       if (request.status === "accepted") {
         pushInfo(`${request.other_user.username} accepted the friend request.`);
